@@ -63,7 +63,7 @@ func TestHeaderEncodeV1Circuit(t *testing.T) {
 		Header: pheader,
 		Data:   Data,
 	}
-	//_, err = frontend.Compile(ecc.BN254.ScalarField(), scs.NewBuilder, &circuit)
+
 	err = test.IsSolved(&circuit, &witness, ecc.BN254.ScalarField())
 	if err != nil {
 		panic(err)

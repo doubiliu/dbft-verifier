@@ -131,22 +131,27 @@ func (headerEncode *HeaderEncode) RlpHash(api frontend.API, header HeaderParamet
 	encodeHeader2[3] = rlp.EncodeRule2(api, header.BaseFee)
 	encodeHeader2[4] = rlp.EncodeRule2(api, header.WithdrawalsHash)
 
-	unfixSlice := make([]PaddingSlice, 4)
+	unfixSlice := make([]PaddingSlice, 2)
 	sApi := NewSliceApi(api)
 	numberSlice := sApi.New(api, header.Number, false)
 	unfixSlice[0] = rlp.EncodeRule2Slice(api, numberSlice)
-	gasLimitSlice := sApi.New(api, header.GasLimit, false)
-	unfixSlice[1] = rlp.EncodeRule2Slice(api, gasLimitSlice)
-	gasUsedSlice := sApi.New(api, header.GasUsed, false)
-	unfixSlice[2] = rlp.EncodeRule2Slice(api, gasUsedSlice)
+	/*	gasLimitSlice := sApi.New(api, header.GasLimit, false)
+		unfixSlice[1] = rlp.EncodeRule2Slice(api, gasLimitSlice)*/
+	gaslimite := rlp.EncodeRule2(api, header.GasLimit)
+	gasUsed := rlp.EncodeRule2(api, header.GasUsed)
+	/*	gasUsedSlice := sApi.New(api, header.GasUsed, false)
+		unfixSlice[1] = rlp.EncodeRule2Slice(api, gasUsedSlice)*/
 	timeSlice := sApi.New(api, header.Time, false)
-	unfixSlice[3] = rlp.EncodeRule2Slice(api, timeSlice)
+	unfixSlice[1] = rlp.EncodeRule2Slice(api, timeSlice)
 
 	resultSlice := unfixSlice[0]
 	sliceApi := NewSliceApi(api)
+	resultSlice = sliceApi.Append(resultSlice, gaslimite, false, false)
+	//api.Println(resultSlice.Slice)
+	resultSlice = sliceApi.Append(resultSlice, gasUsed, false, false)
 	resultSlice = sliceApi.concat(resultSlice, unfixSlice[1], resultSlice.IsLittleEndian)
-	resultSlice = sliceApi.concat(resultSlice, unfixSlice[2], resultSlice.IsLittleEndian)
-	resultSlice = sliceApi.concat(resultSlice, unfixSlice[3], resultSlice.IsLittleEndian)
+	//resultSlice = sliceApi.concat(resultSlice, unfixSlice[2], resultSlice.IsLittleEndian)
+	//resultSlice = sliceApi.concat(resultSlice, unfixSlice[3], resultSlice.IsLittleEndian)
 	generator := func(api frontend.API) []UndeterminedSlice {
 		slices := make([]UndeterminedSlice, 0)
 		isEmpty := api.And(api.IsZero(api.Sub(len(resultSlice.Slice)-2, resultSlice.Padding)), api.IsZero(selector.Mux(api, len(resultSlice.Slice)-1, resultSlice.Slice...))) // == 0
@@ -214,22 +219,28 @@ func (headerEncode *HeaderEncode) HashToG2(api frontend.API, header HeaderParame
 	encodeHeader2[3] = rlp.EncodeRule2(api, header.BaseFee)
 	encodeHeader2[4] = rlp.EncodeRule2(api, header.WithdrawalsHash)
 
-	unfixSlice := make([]PaddingSlice, 4)
+	unfixSlice := make([]PaddingSlice, 2)
 	sApi := NewSliceApi(api)
 	numberSlice := sApi.New(api, header.Number, false)
 	unfixSlice[0] = rlp.EncodeRule2Slice(api, numberSlice)
-	gasLimitSlice := sApi.New(api, header.GasLimit, false)
-	unfixSlice[1] = rlp.EncodeRule2Slice(api, gasLimitSlice)
-	gasUsedSlice := sApi.New(api, header.GasUsed, false)
-	unfixSlice[2] = rlp.EncodeRule2Slice(api, gasUsedSlice)
+
+	/*	gasLimitSlice := sApi.New(api, header.GasLimit, false)
+		unfixSlice[1] = rlp.EncodeRule2Slice(api, gasLimitSlice)*/
+	gaslimit := rlp.EncodeRule2(api, header.GasLimit)
+	gasUsed := rlp.EncodeRule2(api, header.GasUsed)
+	/*	gasUsedSlice := sApi.New(api, header.GasUsed, false)
+		unfixSlice[1] = rlp.EncodeRule2Slice(api, gasUsedSlice)*/
 	timeSlice := sApi.New(api, header.Time, false)
-	unfixSlice[3] = rlp.EncodeRule2Slice(api, timeSlice)
+	unfixSlice[1] = rlp.EncodeRule2Slice(api, timeSlice)
 
 	resultSlice := unfixSlice[0]
 	sliceApi := NewSliceApi(api)
+	resultSlice = sliceApi.Append(resultSlice, gaslimit, false, false)
+	//api.Println(resultSlice.Slice)
+	resultSlice = sliceApi.Append(resultSlice, gasUsed, false, false)
 	resultSlice = sliceApi.concat(resultSlice, unfixSlice[1], resultSlice.IsLittleEndian)
-	resultSlice = sliceApi.concat(resultSlice, unfixSlice[2], resultSlice.IsLittleEndian)
-	resultSlice = sliceApi.concat(resultSlice, unfixSlice[3], resultSlice.IsLittleEndian)
+	//resultSlice = sliceApi.concat(resultSlice, unfixSlice[2], resultSlice.IsLittleEndian)
+	//resultSlice = sliceApi.concat(resultSlice, unfixSlice[3], resultSlice.IsLittleEndian)
 	generator := func(api frontend.API) []UndeterminedSlice {
 		slices := make([]UndeterminedSlice, 0)
 		isEmpty := api.And(api.IsZero(api.Sub(len(resultSlice.Slice)-2, resultSlice.Padding)), api.IsZero(selector.Mux(api, len(resultSlice.Slice)-1, resultSlice.Slice...))) // == 0
@@ -276,7 +287,7 @@ func (headerEncode *HeaderEncode) HashToG2(api frontend.API, header HeaderParame
 		if err != nil {
 			panic(err)
 		}
-		marshaBits := g2.MarshalG2(*hash)
+		marshaBits := g2.Marshal(*hash)
 		hashBytes := make([]frontend.Variable, len(marshaBits)/8)
 		for i := 0; i < len(hashBytes); i++ {
 			tbits := marshaBits[i*8 : (i+1)*8]

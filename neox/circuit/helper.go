@@ -135,6 +135,7 @@ func GetHeaderParamter(header *types.Header) HeaderParameters {
 		panic(err)
 	}
 	gl := buf1.Bytes()
+	gl = removeUnusedZeroBytes(gl)
 	GasLimit := make([]frontend.Variable, len(gl))
 	for i := 0; i < len(gl); i++ {
 		GasLimit[i] = gl[i]
@@ -146,6 +147,7 @@ func GetHeaderParamter(header *types.Header) HeaderParameters {
 		panic(err)
 	}
 	gu := buf2.Bytes()
+	gu = removeUnusedZeroBytes(gu)
 	GasUsed := make([]frontend.Variable, len(gu))
 	for i := 0; i < len(gu); i++ {
 		GasUsed[i] = gu[i]

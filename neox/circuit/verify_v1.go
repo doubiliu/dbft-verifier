@@ -118,7 +118,7 @@ func (verify *Verify) Verify(api frontend.API, current HeaderParameters, parent 
 	headencode := NewHeaderEncode(api)
 	hashBytes := headencode.HashToG2(api, current)
 	g2.AssertIsOnG2(&hash)
-	marshalHashbits := g2.MarshalG2(hash)
+	marshalHashbits := g2.Marshal(hash)
 	marshalHash := make([]frontend.Variable, len(marshalHashbits)/8)
 	for i := 0; i < len(hashBytes); i++ {
 		tbits := marshalHashbits[i*8 : (i+1)*8]

@@ -3,12 +3,15 @@ package circuit
 import (
 	"github.com/consensys/gnark-crypto/ecc"
 	bls12381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
+	"github.com/consensys/gnark/backend/plonk"
+	cs "github.com/consensys/gnark/constraint/bn254"
 	"github.com/consensys/gnark/frontend"
+	"github.com/consensys/gnark/frontend/cs/scs"
 	"github.com/consensys/gnark/std/algebra/emulated/sw_bls12381"
-	"github.com/consensys/gnark/std/algebra/emulated/sw_emulated"
-	"github.com/consensys/gnark/std/math/bits"
 	"github.com/consensys/gnark/test"
+	"github.com/consensys/gnark/test/unsafekzg"
 	"github.com/ethereum/go-ethereum/core/types"
+	"log"
 	"testing"
 )
 
@@ -67,86 +70,59 @@ func TestMultiSigVerifyCircuit(t *testing.T) {
 		Pub:  sw_bls12381.NewG1Affine(pk),
 		Sig:  sw_bls12381.NewG2Affine(sig),
 		Hash: sw_bls12381.NewG2Affine(hash),
-		PK:   xBytes,
 	}
 	witness := BlsSigVerifyWrapper{
 		Pub:  sw_bls12381.NewG1Affine(pk),
 		Sig:  sw_bls12381.NewG2Affine(sig),
 		Hash: sw_bls12381.NewG2Affine(hash),
-		PK:   xBytes,
 	}
-	//_, err = frontend.Compile(ecc.BN254.ScalarField(), scs.NewBuilder, &circuit)
-	err = test.IsSolved(&circuit, &witness, ecc.BN254.ScalarField())
+	/*	err = test.IsSolved(&circuit, &witness, ecc.BN254.ScalarField())
+		if err != nil {
+			panic(err)
+		}*/
+	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), scs.NewBuilder, &circuit)
 	if err != nil {
 		panic(err)
 	}
-	assert.NoError(err)
-}
+	scs := ccs.(*cs.SparseR1CS)
+	srs, srsLagrange, err := unsafekzg.NewSRS(scs)
+	if err != nil {
+		panic(err)
+	}
+	p, vk, err := plonk.Setup(ccs, srs, srsLagrange)
+	//_, err := plonk.Setup(r1cs, kate, &publicWitness)
+	if err != nil {
+		log.Fatal(err)
+	}
+	witnessFull, err := frontend.NewWitness(&witness, ecc.BN254.ScalarField())
+	if err != nil {
+		log.Fatal(err)
+	}
 
-func Sub64(x, y, borrow uint64) (diff, borrowOut uint64) {
-	diff = x - y - borrow
-	// See Sub32 for the bit logic.
-	borrowOut = ((^x & y) | (^(x ^ y) & diff)) >> 63
-	return
+	witnessPublic, err := frontend.NewWitness(&witness, ecc.BN254.ScalarField(), frontend.PublicOnly())
+	if err != nil {
+		log.Fatal(err)
+	}
+	proof, err := plonk.Prove(ccs, p, witnessFull)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = plonk.Verify(proof, vk, witnessPublic)
+	if err != nil {
+		log.Fatal("Error: wrong proof is accepted")
+	}
+	assert.NoError(err)
 }
 
 type BlsSigVerifyWrapper struct {
 	Hash sw_bls12381.G2Affine
 	Sig  sw_bls12381.G2Affine
 	Pub  sw_bls12381.G1Affine
-	PK   []frontend.Variable
 }
-
-const (
-	mMask                 byte = 0b111 << 5
-	mUncompressed         byte = 0b000 << 5
-	_                     byte = 0b001 << 5 // invalid
-	mUncompressedInfinity byte = 0b010 << 5
-	_                     byte = 0b011 << 5 // invalid
-	mCompressedSmallest   byte = 0b100 << 5
-	mCompressedLargest    byte = 0b101 << 5
-	mCompressedInfinity   byte = 0b110 << 5
-	_                     byte = 0b111 << 5 // invalid
-)
 
 // Define declares the circuit's constraints
 func (c *BlsSigVerifyWrapper) Define(api frontend.API) error {
-	cr, err := sw_emulated.New[sw_bls12381.BaseField, sw_bls12381.ScalarField](api, sw_emulated.GetCurveParams[sw_bls12381.BaseField]())
-	if err != nil {
-		panic(err)
-	}
-	pkBits := cr.MarshalG1(c.Pub)
-	pkBytes := make([]frontend.Variable, len(pkBits)/8)
-	for i := 0; i < len(pkBytes); i++ {
-		tbits := pkBits[i*8 : (i+1)*8]
-		treversebits := make([]frontend.Variable, len(tbits))
-		for j := 0; j < len(tbits); j++ {
-			treversebits[j] = tbits[len(tbits)-j-1]
-		}
-		pkBytes[i] = api.FromBinary(treversebits...)
-	}
-	msbMask := mCompressedSmallest
-
-	/*	// compressed, we need to know if Y is lexicographically bigger than -Y
-		// if p.Y ">" -p.Y
-		if c.Pub.Y.LexicographicallyLargest() {
-			msbMask = mCompressedLargest
-		}*/
-	cr, err = sw_emulated.New[sw_bls12381.BaseField, sw_bls12381.ScalarField](api, sw_emulated.GetCurveParams[sw_bls12381.BaseField]())
-	if err != nil {
-		panic(err)
-	}
-	xBytes := pkBytes[0:48]
-	xbits := bits.ToBinary(api, xBytes[0])
-	mbits := bits.ToBinary(api, msbMask)
-	rbits := make([]frontend.Variable, len(xbits))
-	for i := 0; i < len(xbits); i++ {
-		rbits[i] = api.Or(xbits[i], mbits[i])
-	}
-	xBytes[0] = bits.FromBinary(api, rbits)
-	for i := 0; i < len(xBytes); i++ {
-		api.AssertIsEqual(xBytes[i], c.PK[i])
-	}
 	verify := NewBlsSigVerify(api)
 	verify.Verify(api, &c.Hash, &c.Sig, &c.Pub)
 	return nil

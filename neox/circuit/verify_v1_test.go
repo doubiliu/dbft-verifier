@@ -3,12 +3,16 @@ package circuit
 import (
 	"github.com/consensys/gnark-crypto/ecc"
 	bls12381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
+	"github.com/consensys/gnark/backend/plonk"
 	"github.com/consensys/gnark/constraint"
+	cs "github.com/consensys/gnark/constraint/bn254"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/scs"
 	"github.com/consensys/gnark/std/algebra/emulated/sw_bls12381"
 	"github.com/consensys/gnark/test"
+	"github.com/consensys/gnark/test/unsafekzg"
 	"github.com/ethereum/go-ethereum/core/types"
+	"log"
 	"testing"
 )
 
@@ -73,11 +77,6 @@ func TestVerifyCircuit(t *testing.T) {
 	pparent := GetHeaderParamter(parent)
 	pcurrent := GetHeaderParamter(current)
 
-	data, err := encodeSigHeader(current)
-	if err != nil {
-		panic(err)
-	}
-	hash, _ := bls12381.HashToG2(data, BLSDomain)
 	pubBytes := current.Extra[HashableExtraV1Len : HashableExtraV1Len+BLSPublicKeyLen]
 	sigBytes := current.Extra[HashableExtraV1Len+BLSPublicKeyLen : HashableExtraV1Len+BLSPublicKeyLen+BLSSignatureLen]
 	var pk bls12381.G1Affine
@@ -94,6 +93,11 @@ func TestVerifyCircuit(t *testing.T) {
 		Parent:  pparent,
 		Current: pcurrent,
 	}
+	data, err := encodeSigHeader(current)
+	if err != nil {
+		panic(err)
+	}
+	hash, _ := bls12381.HashToG2(data, BLSDomain)
 	witness := VerifyWrapper{
 		Parent:  pparent,
 		Current: pcurrent,
@@ -101,10 +105,41 @@ func TestVerifyCircuit(t *testing.T) {
 		Sig:     sw_bls12381.NewG2Affine(sig),
 		Pub:     sw_bls12381.NewG1Affine(pk),
 	}
-	_, err = frontend.Compile(ecc.BN254.ScalarField(), scs.NewBuilder[constraint.U64], &circuit)
-	err = test.IsSolved(&circuit, &witness, ecc.BN254.ScalarField())
+	/*	err = test.IsSolved(&circuit, &witness, ecc.BN254.ScalarField())
+		if err != nil {
+			panic(err)
+		}*/
+	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), scs.NewBuilder[constraint.U64], &circuit)
 	if err != nil {
 		panic(err)
+	}
+	scs := ccs.(*cs.SparseR1CS)
+	srs, srsLagrange, err := unsafekzg.NewSRS(scs)
+	if err != nil {
+		panic(err)
+	}
+	p, vk, err := plonk.Setup(ccs, srs, srsLagrange)
+	//_, err := plonk.Setup(r1cs, kate, &publicWitness)
+	if err != nil {
+		log.Fatal(err)
+	}
+	witnessFull, err := frontend.NewWitness(&witness, ecc.BN254.ScalarField())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	witnessPublic, err := frontend.NewWitness(&witness, ecc.BN254.ScalarField(), frontend.PublicOnly())
+	if err != nil {
+		log.Fatal(err)
+	}
+	proof, err := plonk.Prove(ccs, p, witnessFull)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = plonk.Verify(proof, vk, witnessPublic)
+	if err == nil {
+		log.Fatal("Error: wrong proof is accepted")
 	}
 	assert.NoError(err)
 }
