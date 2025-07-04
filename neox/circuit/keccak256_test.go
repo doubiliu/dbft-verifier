@@ -1,6 +1,7 @@
 package circuit
 
 import (
+	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/test"
@@ -15,45 +16,48 @@ func TestKecc256Circuit(t *testing.T) {
 	header := new(types.Header)
 	err := header.UnmarshalJSON([]byte(
 		`{
-    "baseFeePerGas": "0x4a817c800",
-    "difficulty": "0x2",
-    "extraData": "0x0101072bc064323344cba6d63cad4ca88afbea585fc612919e3e351f457ea3704f76a5b5119bdcba3022c77f07b13bea98239781492b075fb8a1dff6895377dcd5251c3134660c973244d84101814ad14fa9a2267aebbca32f4f307ffe32c1d387b78585335d413747522953d7eccdfdb54fec71d9c8d28ce456ce51fadbf3dd059a15c42c964250c71107c987966a23d49f086cadf981f812d8deab403047cd8b8438fc8ca79cb6ee9290b3780f80007838",
-    "gasLimit": "0x1c9c380",
-    "gasUsed": "0x0",
-    "hash": "0x72273a91d87952260ff37c86839d69d1e1b6d3bbfc6e00a55198950bbcf182dc",
-    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-    "miner": "0x1212000000000000000000000000000000000003",
-    "mixHash": "0xc1a8ea569ae7daff411094c088d4dd58cd439d241d9c31af61a537c6505761a5",
-    "nonce": "0x0000000000000006",
-    "number": "0x2970da",
-    "parentHash": "0xecd8bd1c514fd33d9e01184783af6f2dd58f3a213b294fe8019aab5271140633",
-    "receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-    "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-    "size": "0x2db",
-    "stateRoot": "0xf675a08553de3363c8abc70879a9cc6ca6c6be517ae21a7f6601835fb6181ff9",
-    "timestamp": "0x680b3b56",
-    "totalDifficulty": "0x5023a7",
-    "transactions": [],
-    "transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-    "uncles": [],
-    "withdrawals": [],
-    "withdrawalsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
-}`,
+			"baseFeePerGas": "0x4a817c800",
+			"difficulty": "0x2",
+			"extraData": "0x000fa7e10abc3b4c9dc768f0fa0a043feb987e21772952f909b98424f1e99f641212951c350ea78a0c4ea2a4697d40247c8be1f2b9ffa03a0e92dcbacca2617fcd447e2932857696c707055f517bbdb2eaa51fe05b0183d01607bf48c1718d1168a1c11171cbbeca26e89011e32ba25610520b20741b809007d10f47396dc6c76ad53546158751582d3e2683ef328f82d2587fb1e58e3cb5fdc1b789f15b4acd6101458614b2f13ab5c822eede4e21a3d265868692073432ad9df7a902a2bf2088721999aad8dddc39e853de6c0110bca64701039749bcb404bc1c1f42efa38975507a7c94316acb681b6776064067918c3c98d340ffa623d509209a42bfc199b7d8a117f6ee007dc458199ecc4b0016d999c0420fcf9df7da68a60e6b82a0c8af62386b538265eb2e589e8bc9a553004700c2d4bd1cf4291390c369ad1dd94d0cbbf271b3c206de1fe9086df359e300c33ce941969e864b1d36434248bc96ce24cb5ab75e48daa3a1a64cb927a3326f0b5546d4d5b813b56b4aee42f32b06703db5b6734da5eb575ef0e33a9fcbd0a800687fb01563327200cc68921d349e6ec8a9c04a5b33729bb51a32077dabd85b5274ae9bf95799318e5fc3e566709a5c65b96a5566c3bec4626f9087320886a97501",
+			"gasLimit": "0x1c9c380",
+			"gasUsed": "0x0",
+			"hash": "0x69d097c89f2f94f33640e8689ecb3b4715fcfca44a16f8c6710c0d29a47e01b1",
+			"logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+			"miner": "0x1212000000000000000000000000000000000003",
+			"mixHash": "0x229c4ebaddc5f4824218d2ec9839f61e984ada15408b8c304a8fbde45a9d12fa",
+			"nonce": "0x0000000000000004",
+			"number": "0x12",
+			"parentHash": "0x5651954a9691194b40ec6fa173a7f7d2ca86c4b30c6dd1af331eaeee079c1e78",
+			"receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+			"size": "0x3f9",
+			"stateRoot": "0xdb2f7ede2ec991c786df6ac4672817f1608b4893484238d06da8a2278924e8e9",
+			"timestamp": "0x668fb5a9",
+			"totalDifficulty": "0x1f",
+			"transactions": [],
+			"transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"uncles": [],
+			"withdrawals": [],
+			"withdrawalsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+		}`,
 	))
-	pubBytes := header.Extra[HashableExtraV1Len : HashableExtraV1Len+BLSPublicKeyLen]
-	k := common.BytesToHash(crypto.Keccak256(pubBytes))
-	kHash := make([]frontend.Variable, 32)
+	rlpBytes, err := encodeHeader(header)
+	fmt.Println(len(rlpBytes), rlpBytes)
+	assert.NoError(err)
+	k := common.BytesToHash(crypto.Keccak256(rlpBytes))
+	fmt.Println(crypto.Keccak256(rlpBytes))
+
+	var kHash [32]frontend.Variable
 	for i := 0; i < len(kHash); i++ {
 		kHash[i] = k[i]
 	}
-	pB := make([]frontend.Variable, len(pubBytes))
-	for i := 0; i < len(pubBytes); i++ {
-		pB[i] = pubBytes[i]
+	pB := make([]frontend.Variable, len(rlpBytes))
+	for i := 0; i < len(rlpBytes); i++ {
+		pB[i] = rlpBytes[i]
 	}
-
 	circuit := Keccak256Wrapper{
 		PreImage: pB,
-		Hash:     make([]frontend.Variable, 32),
+		Hash:     [32]frontend.Variable{},
 	}
 	witness := Keccak256Wrapper{
 		PreImage: pB,
@@ -68,17 +72,18 @@ func TestKecc256Circuit(t *testing.T) {
 }
 
 type Keccak256Wrapper struct {
-	PreImage []frontend.Variable // byte array
-	Hash     []frontend.Variable `gnark:",public"`
+	PreImage []frontend.Variable   // byte array
+	Hash     [32]frontend.Variable `gnark:",public"` // each variable is 64 bit
 }
 
-// Define declares the circuit's constraints
 func (c *Keccak256Wrapper) Define(api frontend.API) error {
-	keccak256 := NewKeccak256(api)
-	hash := keccak256.Compute(c.PreImage)
-	api.Println(c.Hash[:])
-	for j := 0; j < len(c.Hash); j++ {
-		api.AssertIsEqual(hash[j], c.Hash[j])
+	kecczk256 := NewKeccak256(api)
+	computeHash, err := kecczk256.Compute(c.PreImage)
+	if err != nil {
+		return err
+	}
+	for j := 0; j < 32; j++ {
+		api.AssertIsEqual(computeHash[j], c.Hash[j])
 	}
 	return nil
 }

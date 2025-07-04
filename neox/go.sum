@@ -2,8 +2,8 @@ github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDO
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
 github.com/VictoriaMetrics/fastcache v1.12.2 h1:N0y9ASrJ0F6h0QaC3o6uJb3NIZ9VKLjCM7NQbSmF7WI=
 github.com/VictoriaMetrics/fastcache v1.12.2/go.mod h1:AmC+Nzz1+3G2eCPapF6UcsnkThDcMsQicp4xDukwJYI=
-github.com/bane-labs/gnark v0.13.1-0.20250701073034-65cd5715ee0e h1:XuOqLqsO1IteWQzYlS50rP2Du0C5X6m7kKNhry+Xl3Y=
-github.com/bane-labs/gnark v0.13.1-0.20250701073034-65cd5715ee0e/go.mod h1:F6k35ZIi9GC//wW2i9Fz9mURBcLF8qJLQQ/BETnQ9Z4=
+github.com/bane-labs/gnark v0.13.1-0.20250703093324-46aecbb58920 h1:yvDFUkXl+HooLp089d65ZV5CkhICen9DQJESM0ypr/4=
+github.com/bane-labs/gnark v0.13.1-0.20250703093324-46aecbb58920/go.mod h1:F6k35ZIi9GC//wW2i9Fz9mURBcLF8qJLQQ/BETnQ9Z4=
 github.com/bits-and-blooms/bitset v1.22.0 h1:Tquv9S8+SGaS3EhyA+up3FXzmkhxPGjQQCkcs2uw7w4=
 github.com/bits-and-blooms/bitset v1.22.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=

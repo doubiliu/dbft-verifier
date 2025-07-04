@@ -84,47 +84,53 @@ func encodeHeader(header *types.Header) ([]byte, error) {
 }
 
 func GetHeaderParamter(header *types.Header) HeaderParameters {
-	ParentHash := make([]frontend.Variable, len(header.ParentHash))
+	var ParentHash [len(header.ParentHash)]frontend.Variable
 	for i := 0; i < len(header.ParentHash); i++ {
 		ParentHash[i] = header.ParentHash[i]
 	}
-	UncleHash := make([]frontend.Variable, len(header.UncleHash))
+	var UncleHash [len(header.UncleHash)]frontend.Variable
 	for i := 0; i < len(header.UncleHash); i++ {
 		UncleHash[i] = header.UncleHash[i]
 	}
-	Coinbase := make([]frontend.Variable, len(header.Coinbase))
+	var Coinbase [len(header.Coinbase)]frontend.Variable
 	for i := 0; i < len(header.Coinbase); i++ {
 		Coinbase[i] = header.Coinbase[i]
 	}
-	Root := make([]frontend.Variable, len(header.Root))
+	var Root [len(header.Root)]frontend.Variable
 	for i := 0; i < len(header.Root); i++ {
 		Root[i] = header.Root[i]
 	}
-	TxHash := make([]frontend.Variable, len(header.TxHash))
+	var TxHash [len(header.TxHash)]frontend.Variable
 	for i := 0; i < len(header.TxHash); i++ {
 		TxHash[i] = header.TxHash[i]
 	}
-	ReceiptHash := make([]frontend.Variable, len(header.ReceiptHash))
+	var ReceiptHash [len(header.ReceiptHash)]frontend.Variable
 	for i := 0; i < len(header.ReceiptHash); i++ {
 		ReceiptHash[i] = header.ReceiptHash[i]
 	}
-	Bloom := make([]frontend.Variable, len(header.Bloom))
+	var Bloom [len(header.Bloom)]frontend.Variable
 	for i := 0; i < len(header.Bloom); i++ {
 		Bloom[i] = header.Bloom[i]
 	}
-	difficulty := header.Difficulty.Bytes()
-	Difficulty := make([]frontend.Variable, len(difficulty))
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.BigEndian, header.Difficulty.Uint64())
+	if err != nil {
+		fmt.Println("Error encoding uint64:", err)
+		panic(err)
+	}
+	difficulty := buf.Bytes()
+	var Difficulty [8]frontend.Variable
 	for i := 0; i < len(difficulty); i++ {
 		Difficulty[i] = difficulty[i]
 	}
 	buf0 := new(bytes.Buffer)
-	err := binary.Write(buf0, binary.BigEndian, header.Number.Uint64())
+	err = binary.Write(buf0, binary.BigEndian, header.Number.Uint64())
 	if err != nil {
 		fmt.Println("Error encoding uint64:", err)
 		panic(err)
 	}
 	number := buf0.Bytes()
-	Number := make([]frontend.Variable, len(number))
+	var Number [8]frontend.Variable
 	for i := 0; i < len(number); i++ {
 		Number[i] = number[i]
 	}
@@ -135,8 +141,8 @@ func GetHeaderParamter(header *types.Header) HeaderParameters {
 		panic(err)
 	}
 	gl := buf1.Bytes()
-	gl = removeUnusedZeroBytes(gl)
-	GasLimit := make([]frontend.Variable, len(gl))
+	//gl = removeUnusedZeroBytes(gl)
+	var GasLimit [8]frontend.Variable
 	for i := 0; i < len(gl); i++ {
 		GasLimit[i] = gl[i]
 	}
@@ -147,8 +153,8 @@ func GetHeaderParamter(header *types.Header) HeaderParameters {
 		panic(err)
 	}
 	gu := buf2.Bytes()
-	gu = removeUnusedZeroBytes(gu)
-	GasUsed := make([]frontend.Variable, len(gu))
+	//gu = removeUnusedZeroBytes(gu)
+	var GasUsed [8]frontend.Variable
 	for i := 0; i < len(gu); i++ {
 		GasUsed[i] = gu[i]
 	}
@@ -159,7 +165,7 @@ func GetHeaderParamter(header *types.Header) HeaderParameters {
 		panic(err)
 	}
 	time := buf3.Bytes()
-	Time := make([]frontend.Variable, len(time))
+	var Time [8]frontend.Variable
 	for i := 0; i < len(time); i++ {
 		Time[i] = time[i]
 	}
@@ -167,40 +173,45 @@ func GetHeaderParamter(header *types.Header) HeaderParameters {
 	for i := 0; i < len(header.Extra); i++ {
 		Extra[i] = header.Extra[i]
 	}
-	MixDigest := make([]frontend.Variable, len(header.MixDigest))
+	var MixDigest [len(header.MixDigest)]frontend.Variable
 	for i := 0; i < len(header.MixDigest); i++ {
 		MixDigest[i] = header.MixDigest[i]
 	}
-	Nonce := make([]frontend.Variable, len(header.Nonce))
+	var Nonce [len(header.Nonce)]frontend.Variable
 	for i := 0; i < len(header.Nonce); i++ {
 		Nonce[i] = header.Nonce[i]
 	}
-	bf := header.BaseFee.Bytes()
-	BaseFee := make([]frontend.Variable, len(bf))
+	buf4 := new(bytes.Buffer)
+	err = binary.Write(buf4, binary.BigEndian, header.BaseFee.Uint64())
+	if err != nil {
+		fmt.Println("Error encoding uint64:", err)
+		panic(err)
+	}
+	bf := buf4.Bytes()
+	var BaseFee [8]frontend.Variable
 	for i := 0; i < len(bf); i++ {
 		BaseFee[i] = bf[i]
 	}
-	WithdrawalsHash := make([]frontend.Variable, len(header.WithdrawalsHash))
+	var WithdrawalsHash [32]frontend.Variable
 	for i := 0; i < len(header.WithdrawalsHash); i++ {
 		WithdrawalsHash[i] = header.WithdrawalsHash[i]
 	}
 	pheader := HeaderParameters{
-		ParentHash:  ParentHash,
-		UncleHash:   UncleHash,
-		Coinbase:    Coinbase,
-		Root:        Root,
-		TxHash:      TxHash,
-		ReceiptHash: ReceiptHash,
-		Bloom:       Bloom,
-		Difficulty:  Difficulty,
-		Number:      Number,
-		GasLimit:    GasLimit,
-		GasUsed:     GasUsed,
-		Time:        Time,
-		Extra:       Extra,
-		MixDigest:   MixDigest,
-		Nonce:       Nonce,
-
+		ParentHash:      ParentHash,
+		UncleHash:       UncleHash,
+		Coinbase:        Coinbase,
+		Root:            Root,
+		TxHash:          TxHash,
+		ReceiptHash:     ReceiptHash,
+		Bloom:           Bloom,
+		Difficulty:      Difficulty,
+		Number:          Number,
+		GasLimit:        GasLimit,
+		GasUsed:         GasUsed,
+		Time:            Time,
+		Extra:           Extra,
+		MixDigest:       MixDigest,
+		Nonce:           Nonce,
 		BaseFee:         BaseFee,
 		WithdrawalsHash: WithdrawalsHash,
 	}

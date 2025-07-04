@@ -9,24 +9,32 @@ import (
 )
 
 type HeaderParameters struct {
-	ParentHash  []frontend.Variable
-	UncleHash   []frontend.Variable
-	Coinbase    []frontend.Variable
-	Root        []frontend.Variable
-	TxHash      []frontend.Variable
-	ReceiptHash []frontend.Variable
-	Bloom       []frontend.Variable
-	Difficulty  []frontend.Variable
-	Number      []frontend.Variable
-	GasLimit    []frontend.Variable
-	GasUsed     []frontend.Variable
-	Time        []frontend.Variable
+	ParentHash  [32]frontend.Variable
+	UncleHash   [32]frontend.Variable
+	Coinbase    [20]frontend.Variable
+	Root        [32]frontend.Variable
+	TxHash      [32]frontend.Variable
+	ReceiptHash [32]frontend.Variable
+	Bloom       [256]frontend.Variable
+	Difficulty  [8]frontend.Variable
+	Number      [8]frontend.Variable
+	GasLimit    [8]frontend.Variable
+	GasUsed     [8]frontend.Variable
+	Time        [8]frontend.Variable
 	Extra       []frontend.Variable
-	MixDigest   []frontend.Variable
-	Nonce       []frontend.Variable
+	MixDigest   [32]frontend.Variable
+	Nonce       [8]frontend.Variable
 
-	BaseFee         []frontend.Variable
-	WithdrawalsHash []frontend.Variable
+	BaseFee         [8]frontend.Variable
+	WithdrawalsHash [32]frontend.Variable
+}
+
+type CutHeaderParameters struct {
+	ParentHash []frontend.Variable
+	Number     []frontend.Variable
+	Time       []frontend.Variable
+	Extra      []frontend.Variable
+	MixDigest  []frontend.Variable
 }
 
 func NewHeaderEncode(api frontend.API) HeaderEncode {
@@ -78,36 +86,6 @@ func rangeCheck(api frontend.API, x frontend.Variable, limits []frontend.Variabl
 	api.AssertIsEqual(flag, frontend.Variable(1))
 }
 
-func (headerEncode *HeaderEncode) EncodeSigHeader(api frontend.API, header HeaderParameters) []frontend.Variable {
-	hashableExtraLen := HashableExtraV1Len
-	v := header.Extra[0]
-	//Extra[0] should be ExtraV1 | ExtraV2
-	rangeCheck(api, v, []frontend.Variable{frontend.Variable(ExtraV1), frontend.Variable(ExtraV2)})
-
-	rlp := NewRlpEncode(api)
-	encodeHeader := make([][]frontend.Variable, 17)
-	encodeHeader[0] = rlp.EncodeRule2(api, header.ParentHash)
-	encodeHeader[1] = rlp.EncodeRule2(api, header.UncleHash)
-	encodeHeader[2] = rlp.EncodeRule2(api, header.Coinbase)
-	encodeHeader[3] = rlp.EncodeRule2(api, header.Root)
-	encodeHeader[4] = rlp.EncodeRule2(api, header.TxHash)
-	encodeHeader[5] = rlp.EncodeRule2(api, header.ReceiptHash)
-	encodeHeader[6] = rlp.EncodeRule3_TwoBytes(api, header.Bloom)
-	encodeHeader[7] = rlp.EncodeRule1(api, header.Difficulty)
-	encodeHeader[8] = rlp.EncodeRule2(api, header.Number)
-	encodeHeader[9] = rlp.EncodeRule2(api, header.GasLimit)
-	encodeHeader[10] = rlp.EncodeRule2(api, header.GasUsed)
-	encodeHeader[11] = rlp.EncodeRule2(api, header.Time)
-	encodeHeader[12] = rlp.EncodeRule2(api, header.Extra[:hashableExtraLen])
-	encodeHeader[13] = rlp.EncodeRule2(api, header.MixDigest)
-	encodeHeader[14] = rlp.EncodeRule2(api, header.Nonce)
-	encodeHeader[15] = rlp.EncodeRule2(api, header.BaseFee)
-	encodeHeader[16] = rlp.EncodeRule2(api, header.WithdrawalsHash)
-
-	return rlp.EncodeRule5_TwoBytes(api, encodeHeader)
-	//api.Println(extraData)
-}
-
 func (headerEncode *HeaderEncode) RlpHash(api frontend.API, header HeaderParameters) []frontend.Variable {
 	v := header.Extra[0]
 	//Extra[0] should be ExtraV1 | ExtraV2
@@ -115,43 +93,38 @@ func (headerEncode *HeaderEncode) RlpHash(api frontend.API, header HeaderParamet
 
 	rlp := NewRlpEncode(api)
 	encodeHeader1 := make([][]frontend.Variable, 8)
-	encodeHeader1[0] = rlp.EncodeRule2(api, header.ParentHash)
-	encodeHeader1[1] = rlp.EncodeRule2(api, header.UncleHash)
-	encodeHeader1[2] = rlp.EncodeRule2(api, header.Coinbase)
-	encodeHeader1[3] = rlp.EncodeRule2(api, header.Root)
-	encodeHeader1[4] = rlp.EncodeRule2(api, header.TxHash)
-	encodeHeader1[5] = rlp.EncodeRule2(api, header.ReceiptHash)
-	encodeHeader1[6] = rlp.EncodeRule3_TwoBytes(api, header.Bloom)
-	encodeHeader1[7] = rlp.EncodeRule1(api, header.Difficulty)
+	encodeHeader1[0] = rlp.EncodeRule2(api, header.ParentHash[:])
+	encodeHeader1[1] = rlp.EncodeRule2(api, header.UncleHash[:])
+	encodeHeader1[2] = rlp.EncodeRule2(api, header.Coinbase[:])
+	encodeHeader1[3] = rlp.EncodeRule2(api, header.Root[:])
+	encodeHeader1[4] = rlp.EncodeRule2(api, header.TxHash[:])
+	encodeHeader1[5] = rlp.EncodeRule2(api, header.ReceiptHash[:])
+	encodeHeader1[6] = rlp.EncodeRule3_TwoBytes(api, header.Bloom[:])
+	encodeHeader1[7] = rlp.EncodeRule1(api, []frontend.Variable{header.Difficulty[7]})
 
 	encodeHeader2 := make([][]frontend.Variable, 5)
 	encodeHeader2[0] = rlp.EncodeRule3_OneByte(api, header.Extra)
-	encodeHeader2[1] = rlp.EncodeRule2(api, header.MixDigest)
-	encodeHeader2[2] = rlp.EncodeRule2(api, header.Nonce)
-	encodeHeader2[3] = rlp.EncodeRule2(api, header.BaseFee)
-	encodeHeader2[4] = rlp.EncodeRule2(api, header.WithdrawalsHash)
+	encodeHeader2[1] = rlp.EncodeRule2(api, header.MixDigest[:])
+	encodeHeader2[2] = rlp.EncodeRule2(api, header.Nonce[:])
+	encodeHeader2[3] = rlp.EncodeRule2(api, header.BaseFee[3:])
+	encodeHeader2[4] = rlp.EncodeRule2(api, header.WithdrawalsHash[:])
 
-	unfixSlice := make([]PaddingSlice, 2)
+	unfixSlice := make([]PaddingSlice, 4)
 	sApi := NewSliceApi(api)
-	numberSlice := sApi.New(api, header.Number, false)
+	numberSlice := sApi.New(api, header.Number[:], false)
 	unfixSlice[0] = rlp.EncodeRule2Slice(api, numberSlice)
-	/*	gasLimitSlice := sApi.New(api, header.GasLimit, false)
-		unfixSlice[1] = rlp.EncodeRule2Slice(api, gasLimitSlice)*/
-	gaslimite := rlp.EncodeRule2(api, header.GasLimit)
-	gasUsed := rlp.EncodeRule2(api, header.GasUsed)
-	/*	gasUsedSlice := sApi.New(api, header.GasUsed, false)
-		unfixSlice[1] = rlp.EncodeRule2Slice(api, gasUsedSlice)*/
-	timeSlice := sApi.New(api, header.Time, false)
-	unfixSlice[1] = rlp.EncodeRule2Slice(api, timeSlice)
+	gasLimitSlice := sApi.New(api, header.GasLimit[:], false)
+	unfixSlice[1] = rlp.EncodeRule2Slice(api, gasLimitSlice)
+	gasUsedSlice := sApi.New(api, header.GasUsed[:], false)
+	unfixSlice[2] = rlp.EncodeRule2Slice(api, gasUsedSlice)
+	timeSlice := sApi.New(api, header.Time[:], false)
+	unfixSlice[3] = rlp.EncodeRule2Slice(api, timeSlice)
 
 	resultSlice := unfixSlice[0]
 	sliceApi := NewSliceApi(api)
-	resultSlice = sliceApi.Append(resultSlice, gaslimite, false, false)
-	//api.Println(resultSlice.Slice)
-	resultSlice = sliceApi.Append(resultSlice, gasUsed, false, false)
 	resultSlice = sliceApi.concat(resultSlice, unfixSlice[1], resultSlice.IsLittleEndian)
-	//resultSlice = sliceApi.concat(resultSlice, unfixSlice[2], resultSlice.IsLittleEndian)
-	//resultSlice = sliceApi.concat(resultSlice, unfixSlice[3], resultSlice.IsLittleEndian)
+	resultSlice = sliceApi.concat(resultSlice, unfixSlice[2], resultSlice.IsLittleEndian)
+	resultSlice = sliceApi.concat(resultSlice, unfixSlice[3], resultSlice.IsLittleEndian)
 	generator := func(api frontend.API) []UndeterminedSlice {
 		slices := make([]UndeterminedSlice, 0)
 		isEmpty := api.And(api.IsZero(api.Sub(len(resultSlice.Slice)-2, resultSlice.Padding)), api.IsZero(selector.Mux(api, len(resultSlice.Slice)-1, resultSlice.Slice...))) // == 0
@@ -185,7 +158,10 @@ func (headerEncode *HeaderEncode) RlpHash(api frontend.API, header HeaderParamet
 		//fmt.Println(result)
 
 		kecczk256 := NewKeccak256(api)
-		computeHash := kecczk256.Compute(result)
+		computeHash, err := kecczk256.Compute(result)
+		if err != nil {
+			panic(err)
+		}
 		return computeHash[:], nil
 	}
 	result, err := sliceComposer.Process(32, fn, generator)
@@ -203,44 +179,38 @@ func (headerEncode *HeaderEncode) HashToG2(api frontend.API, header HeaderParame
 
 	rlp := NewRlpEncode(api)
 	encodeHeader1 := make([][]frontend.Variable, 8)
-	encodeHeader1[0] = rlp.EncodeRule2(api, header.ParentHash)
-	encodeHeader1[1] = rlp.EncodeRule2(api, header.UncleHash)
-	encodeHeader1[2] = rlp.EncodeRule2(api, header.Coinbase)
-	encodeHeader1[3] = rlp.EncodeRule2(api, header.Root)
-	encodeHeader1[4] = rlp.EncodeRule2(api, header.TxHash)
-	encodeHeader1[5] = rlp.EncodeRule2(api, header.ReceiptHash)
-	encodeHeader1[6] = rlp.EncodeRule3_TwoBytes(api, header.Bloom)
-	encodeHeader1[7] = rlp.EncodeRule1(api, header.Difficulty)
+	encodeHeader1[0] = rlp.EncodeRule2(api, header.ParentHash[:])
+	encodeHeader1[1] = rlp.EncodeRule2(api, header.UncleHash[:])
+	encodeHeader1[2] = rlp.EncodeRule2(api, header.Coinbase[:])
+	encodeHeader1[3] = rlp.EncodeRule2(api, header.Root[:])
+	encodeHeader1[4] = rlp.EncodeRule2(api, header.TxHash[:])
+	encodeHeader1[5] = rlp.EncodeRule2(api, header.ReceiptHash[:])
+	encodeHeader1[6] = rlp.EncodeRule3_TwoBytes(api, header.Bloom[:])
+	encodeHeader1[7] = rlp.EncodeRule1(api, []frontend.Variable{header.Difficulty[7]})
 
 	encodeHeader2 := make([][]frontend.Variable, 5)
 	encodeHeader2[0] = rlp.EncodeRule2(api, header.Extra[:hashableExtraLen])
-	encodeHeader2[1] = rlp.EncodeRule2(api, header.MixDigest)
-	encodeHeader2[2] = rlp.EncodeRule2(api, header.Nonce)
-	encodeHeader2[3] = rlp.EncodeRule2(api, header.BaseFee)
-	encodeHeader2[4] = rlp.EncodeRule2(api, header.WithdrawalsHash)
+	encodeHeader2[1] = rlp.EncodeRule2(api, header.MixDigest[:])
+	encodeHeader2[2] = rlp.EncodeRule2(api, header.Nonce[:])
+	encodeHeader2[3] = rlp.EncodeRule2(api, header.BaseFee[3:])
+	encodeHeader2[4] = rlp.EncodeRule2(api, header.WithdrawalsHash[:])
 
-	unfixSlice := make([]PaddingSlice, 2)
+	unfixSlice := make([]PaddingSlice, 4)
 	sApi := NewSliceApi(api)
-	numberSlice := sApi.New(api, header.Number, false)
+	numberSlice := sApi.New(api, header.Number[:], false)
 	unfixSlice[0] = rlp.EncodeRule2Slice(api, numberSlice)
-
-	/*	gasLimitSlice := sApi.New(api, header.GasLimit, false)
-		unfixSlice[1] = rlp.EncodeRule2Slice(api, gasLimitSlice)*/
-	gaslimit := rlp.EncodeRule2(api, header.GasLimit)
-	gasUsed := rlp.EncodeRule2(api, header.GasUsed)
-	/*	gasUsedSlice := sApi.New(api, header.GasUsed, false)
-		unfixSlice[1] = rlp.EncodeRule2Slice(api, gasUsedSlice)*/
-	timeSlice := sApi.New(api, header.Time, false)
-	unfixSlice[1] = rlp.EncodeRule2Slice(api, timeSlice)
+	gasLimitSlice := sApi.New(api, header.GasLimit[:], false)
+	unfixSlice[1] = rlp.EncodeRule2Slice(api, gasLimitSlice)
+	gasUsedSlice := sApi.New(api, header.GasUsed[:], false)
+	unfixSlice[2] = rlp.EncodeRule2Slice(api, gasUsedSlice)
+	timeSlice := sApi.New(api, header.Time[:], false)
+	unfixSlice[3] = rlp.EncodeRule2Slice(api, timeSlice)
 
 	resultSlice := unfixSlice[0]
 	sliceApi := NewSliceApi(api)
-	resultSlice = sliceApi.Append(resultSlice, gaslimit, false, false)
-	//api.Println(resultSlice.Slice)
-	resultSlice = sliceApi.Append(resultSlice, gasUsed, false, false)
 	resultSlice = sliceApi.concat(resultSlice, unfixSlice[1], resultSlice.IsLittleEndian)
-	//resultSlice = sliceApi.concat(resultSlice, unfixSlice[2], resultSlice.IsLittleEndian)
-	//resultSlice = sliceApi.concat(resultSlice, unfixSlice[3], resultSlice.IsLittleEndian)
+	resultSlice = sliceApi.concat(resultSlice, unfixSlice[2], resultSlice.IsLittleEndian)
+	resultSlice = sliceApi.concat(resultSlice, unfixSlice[3], resultSlice.IsLittleEndian)
 	generator := func(api frontend.API) []UndeterminedSlice {
 		slices := make([]UndeterminedSlice, 0)
 		isEmpty := api.And(api.IsZero(api.Sub(len(resultSlice.Slice)-2, resultSlice.Padding)), api.IsZero(selector.Mux(api, len(resultSlice.Slice)-1, resultSlice.Slice...))) // == 0
@@ -270,7 +240,7 @@ func (headerEncode *HeaderEncode) HashToG2(api frontend.API, header HeaderParame
 		r = append(r, encodeHeader2[4])
 
 		data := rlp.EncodeRule5_TwoBytes(api, r)
-		//fmt.Println(result)
+		//api.Println(data)
 		u8data := make([]uints.U8, len(data))
 		uapi, err := uints.New[uints.U32](api)
 		if err != nil {
@@ -287,77 +257,124 @@ func (headerEncode *HeaderEncode) HashToG2(api frontend.API, header HeaderParame
 		if err != nil {
 			panic(err)
 		}
-		marshaBits := g2.Marshal(*hash)
-		hashBytes := make([]frontend.Variable, len(marshaBits)/8)
-		for i := 0; i < len(hashBytes); i++ {
-			tbits := marshaBits[i*8 : (i+1)*8]
-			treversebits := make([]frontend.Variable, len(tbits))
-			for j := 0; j < len(tbits); j++ {
-				treversebits[j] = tbits[len(tbits)-j-1]
-			}
-			hashBytes[i] = api.FromBinary(treversebits...)
+		hashBytes, err := g2.ToCompressedBytes(*hash)
+		if err != nil {
+			panic(err)
 		}
-		return hashBytes, nil
+		hashArry := make([]frontend.Variable, len(hashBytes))
+		for i := 0; i < len(hashBytes); i++ {
+			hashArry[i] = hashBytes[i].Val
+		}
+		/*		hashBytes := make([]frontend.Variable, len(marshaBits)/8)
+				for i := 0; i < len(hashBytes); i++ {
+					tbits := marshaBits[i*8 : (i+1)*8]
+					treversebits := make([]frontend.Variable, len(tbits))
+					for j := 0; j < len(tbits); j++ {
+						treversebits[j] = tbits[len(tbits)-j-1]
+					}
+					hashBytes[i] = api.FromBinary(treversebits...)
+				}*/
+		return hashArry, nil
 	}
-	result, err := sliceComposer.Process(192, fn, generator)
+	result, err := sliceComposer.Process(96, fn, generator)
 	if err != nil {
 		panic(err)
 	}
 	return result
 }
 
-func (headerEncode *HeaderEncode) EncodeHeader(api frontend.API, header HeaderParameters) []frontend.Variable {
-	//hashableExtraLen := HashableExtraV1Len
-	v := header.Extra[0]
-	//Extra[0] should be ExtraV1 | ExtraV2
-	rangeCheck(api, v, []frontend.Variable{frontend.Variable(ExtraV1), frontend.Variable(ExtraV2)})
+type HeaderRLPEncodeVerifyWrapper struct {
+	Input []frontend.Variable `gnark:",public"`
+}
 
-	rlp := NewRlpEncode(api)
-	encodeHeader := make([][]frontend.Variable, 17)
-	encodeHeader[0] = rlp.EncodeRule2(api, header.ParentHash)
-	encodeHeader[1] = rlp.EncodeRule2(api, header.UncleHash)
-	encodeHeader[2] = rlp.EncodeRule2(api, header.Coinbase)
-	encodeHeader[3] = rlp.EncodeRule2(api, header.Root)
-	encodeHeader[4] = rlp.EncodeRule2(api, header.TxHash)
-	encodeHeader[5] = rlp.EncodeRule2(api, header.ReceiptHash)
-	encodeHeader[6] = rlp.EncodeRule3_TwoBytes(api, header.Bloom)
-	encodeHeader[7] = rlp.EncodeRule1(api, header.Difficulty)
-	encodeHeader[8] = rlp.EncodeRule2(api, header.Number)
-	encodeHeader[9] = rlp.EncodeRule2(api, header.GasLimit)
-	encodeHeader[10] = rlp.EncodeRule2(api, header.GasUsed)
-	encodeHeader[11] = rlp.EncodeRule2(api, header.Time)
-	encodeHeader[12] = rlp.EncodeRule3_OneByte(api, header.Extra)
-	encodeHeader[13] = rlp.EncodeRule2(api, header.MixDigest)
-	encodeHeader[14] = rlp.EncodeRule2(api, header.Nonce)
-	encodeHeader[15] = rlp.EncodeRule2(api, header.BaseFee)
-	encodeHeader[16] = rlp.EncodeRule2(api, header.WithdrawalsHash)
+// Define declares the circuit's constraints
+func (c *HeaderRLPEncodeVerifyWrapper) Define(api frontend.API) error {
+	RLPHash := c.Input[:32]
+	Input := c.Input[32:]
+	header := Deserialize(Input)
+	encode := NewHeaderEncode(api)
+	rlpHash := encode.RlpHash(api, header)
+	for i := 0; i < len(rlpHash); i++ {
+		api.AssertIsEqual(rlpHash[i], RLPHash[i])
+	}
+	return nil
+}
+func Serialize(header HeaderParameters) []frontend.Variable {
+	input := make([]frontend.Variable, 0)
+	input = append(input, header.ParentHash[:]...)
+	input = append(input, header.UncleHash[:]...)
+	input = append(input, header.Coinbase[:]...)
+	input = append(input, header.Root[:]...)
+	input = append(input, header.TxHash[:]...)
+	input = append(input, header.ReceiptHash[:]...)
+	input = append(input, header.Bloom[:]...)
+	input = append(input, header.Difficulty[:]...)
+	input = append(input, header.Number[:]...)
+	input = append(input, header.GasLimit[:]...)
+	input = append(input, header.GasUsed[:]...)
+	input = append(input, header.Time[:]...)
+	input = append(input, header.MixDigest[:]...)
+	input = append(input, header.Nonce[:]...)
+	input = append(input, header.BaseFee[:]...)
+	input = append(input, header.WithdrawalsHash[:]...)
+	input = append(input, header.Extra...)
+	return input
+}
+func Deserialize(input []frontend.Variable) HeaderParameters {
+	index := 0
+	var header HeaderParameters
+	copy(header.ParentHash[:], input[index:index+len(header.ParentHash)])
+	index += len(header.ParentHash)
+	copy(header.UncleHash[:], input[index:index+len(header.UncleHash)])
+	index += len(header.UncleHash)
+	copy(header.Coinbase[:], input[index:index+len(header.Coinbase)])
+	index += len(header.Coinbase)
+	copy(header.Root[:], input[index:index+len(header.Root)])
+	index += len(header.Root)
+	copy(header.TxHash[:], input[index:index+len(header.TxHash)])
+	index += len(header.TxHash)
+	copy(header.ReceiptHash[:], input[index:index+len(header.ReceiptHash)])
+	index += len(header.ReceiptHash)
+	copy(header.Bloom[:], input[index:index+len(header.Bloom)])
+	index += len(header.Bloom)
+	copy(header.Difficulty[:], input[index:index+len(header.Difficulty)])
+	index += len(header.Difficulty)
+	copy(header.Number[:], input[index:index+len(header.Number)])
+	index += len(header.Number)
+	copy(header.GasLimit[:], input[index:index+len(header.GasLimit)])
+	index += len(header.GasLimit)
+	copy(header.GasUsed[:], input[index:index+len(header.GasUsed)])
+	index += len(header.GasUsed)
+	copy(header.Time[:], input[index:index+len(header.Time)])
+	index += len(header.Time)
+	copy(header.MixDigest[:], input[index:index+len(header.MixDigest)])
+	index += len(header.MixDigest)
+	copy(header.Nonce[:], input[index:index+len(header.Nonce)])
+	index += len(header.Nonce)
+	copy(header.BaseFee[:], input[index:index+len(header.BaseFee)])
+	index += len(header.BaseFee)
+	copy(header.WithdrawalsHash[:], input[index:index+len(header.WithdrawalsHash)])
+	index += len(header.WithdrawalsHash)
+	header.Extra = make([]frontend.Variable, len(input[index:]))
+	copy(header.Extra[:], input[index:])
+	return header
+}
 
-	return rlp.EncodeRule5_TwoBytes(api, encodeHeader)
-	//api.Println(extraData)
-	/*	enc := make([]frontend.Variable, 0)
-		enc = append(enc, header.ParentHash...)
-		enc = append(enc, header.UncleHash...)
-		enc = append(enc, header.Coinbase...)
-		enc = append(enc, header.Root...)
-		enc = append(enc, header.TxHash...)
-		enc = append(enc, header.ReceiptHash...)
-		enc = append(enc, header.Bloom...)
-		enc = append(enc, header.Difficulty)
-		enc = append(enc, header.Number)
-		enc = append(enc, header.GasLimit)
-		enc = append(enc, header.GasUsed)
-		enc = append(enc, header.Time)
-		enc = append(enc, header.Extra[:hashableExtraLen]...) // Yes, this will panic if extra is too short
-		enc = append(enc, header.MixDigest...)
-		enc = append(enc, header.Nonce...)
-		/*	if header.BaseFee != nil {
-			enc = append(enc, header.BaseFee)
-		}*/
-	//enc = append(enc, header.BaseFee)
-	/*	if header.WithdrawalsHash != nil {
-		enc = append(enc, header.WithdrawalsHash)
-	}*/
-	//enc = append(enc, header.WithdrawalsHash...)
-	//return rlp.EncodeToBytes(enc)
-	//return enc*/
+type HeaderHashToG2VerifyWrapper struct {
+	Input []frontend.Variable `gnark:",public"`
+}
+
+// Define declares the circuit's constraints
+func (c *HeaderHashToG2VerifyWrapper) Define(api frontend.API) error {
+	ToG2Hash := c.Input[:96]
+	Input := c.Input[96:]
+	header := Deserialize(Input)
+	encode := NewHeaderEncode(api)
+	toG2Hash := encode.HashToG2(api, header)
+	/*	api.Println(toG2Hash)
+		api.Println(ToG2Hash)*/
+	for i := 0; i < len(toG2Hash); i++ {
+		api.AssertIsEqual(toG2Hash[i], ToG2Hash[i])
+	}
+	return nil
 }

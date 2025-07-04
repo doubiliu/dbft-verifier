@@ -1,92 +1,182 @@
 package circuit
 
 import (
-	"fmt"
 	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/std/math/uints"
-	"github.com/consensys/gnark/std/permutation/keccakf"
 )
 
+var (
+	rate       = 1088
+	blockWidth = 1600
+	rho        = []int{1, 3, 6, 10, 15, 21,
+		28, 36, 45, 55, 2, 14,
+		27, 41, 56, 8, 25, 43,
+		62, 18, 39, 61, 20, 44}
+	pi = []int{10, 7, 11, 17, 18, 3,
+		5, 16, 8, 21, 24, 4,
+		15, 23, 19, 13, 12, 2,
+		20, 14, 22, 9, 6, 1}
+	RC = []uint64{1, 0x8082, 0x800000000000808a, 0x8000000080008000,
+		0x808b, 0x80000001, 0x8000000080008081, 0x8000000000008009,
+		0x8a, 0x88, 0x80008009, 0x8000000a,
+		0x8000808b, 0x800000000000008b, 0x8000000000008089, 0x8000000000008003,
+		0x8000000000008002, 0x8000000000000080, 0x800a, 0x800000008000000a,
+		0x8000000080008081, 0x8000000000008080, 0x80000001, 0x8000000080008008}
+)
+
+// SHA-3-256 (Keccak256) circuit. Equivalent with solidity keccak256() function.
+// InputVariables - binary array of input
+// OutputVariables - binary array of output. Should have size 256
+// block - binary array of SHA-3 state should have size 1600
+
 type Keccak256 struct {
-	api frontend.API
+	api            frontend.API
+	InputVariables []frontend.Variable `gnark:",public"`
+	//OutputVariables []frontend.Variable `gnark:",public"`
+	block []frontend.Variable
 }
 
+// NewKeccak256 Creates a new keccak256 instance
+// preImage is a byte array
+// each variable in hash is a byte
 func NewKeccak256(api frontend.API) Keccak256 {
-	return Keccak256{api: api}
-}
-func (c *Keccak256) Compute(PreImage []frontend.Variable) []frontend.Variable {
-	inputSizeInBytes := len(PreImage)
-	api := c.api
+	//	inputs := make([]frontend.Variable, 0)
+	//	for i := 0; i < len(preImage); i++ {
+	//		inputs = append(inputs, api.ToBinary(preImage[i], 8)...)
+	//	}
+	//outputs := make([]frontend.Variable, 0)
+	//for i := 0; i < len(hash); i++ {
+	//	outputs = append(outputs, api.ToBinary(hash[i], 8)...)
+	//}
+	//api.AssertIsEqual(len(outputs), 256)
+	block := make([]frontend.Variable, blockWidth)
 
-	var state [25]uints.U64
-	for i := range state {
-		state[i] = uints.NewU64(0)
+	return Keccak256{
+		api: api,
+		//InputVariables:  inputs,
+		//OutputVariables: outputs,
+		block: block,
 	}
+}
 
-	inputSizeInUint64 := (inputSizeInBytes + 8 - 1) / 8
-	paddedPreImageLength := inputSizeInUint64 + 17 - (inputSizeInUint64 % 17)
-	paddedPreImage := make([]frontend.Variable, paddedPreImageLength)
-	for i := 0; i < inputSizeInUint64; i++ {
-		binUint64 := make([]frontend.Variable, 0)
-		for j := 0; j < 8; j++ {
-			if i*8+j < inputSizeInBytes {
-				binUint64 = append(binUint64, api.ToBinary(PreImage[i*8+j], 8)...)
-			} else {
-				binUint64 = append(binUint64, api.ToBinary(0, 8)...)
+func (circuit *Keccak256) theta(api frontend.API) {
+	b := make([][]frontend.Variable, 5)
+	for i := 0; i < 5; i++ {
+		b[i] = make([]frontend.Variable, 64)
+		for j := 0; j < 64; j++ {
+			b[i][j] = 0
+		}
+		for j := 0; j < 5; j++ {
+			for l := 0; l < 64; l++ {
+				b[i][l] = api.Xor(b[i][l], circuit.block[(i+j*5)*64+l])
 			}
 		}
-		paddedPreImage[i] = api.FromBinary(binUint64...)
 	}
-	for i := inputSizeInUint64; i < paddedPreImageLength; i++ {
-		paddedPreImage[i] = 0
-	}
-
-	lastUint64ByteCount := inputSizeInBytes % 8
-	if lastUint64ByteCount > 0 {
-		paddedPreImage[inputSizeInUint64-1] = padWith0x1(api, paddedPreImage[inputSizeInUint64-1], lastUint64ByteCount)
-	} else {
-		paddedPreImage[inputSizeInUint64] = padWith0x1(api, paddedPreImage[inputSizeInUint64], lastUint64ByteCount)
-	}
-
-	toPad := api.ToBinary(paddedPreImage[paddedPreImageLength-1], 64)
-	toPad[63] = 1
-	paddedPreImage[paddedPreImageLength-1] = api.FromBinary(toPad...)
-
-	uapi, err := uints.New[uints.U64](api)
-	if err != nil {
-		panic(err)
-	}
-	for i := 0; i < len(paddedPreImage); i += 17 {
-		for j := 0; j < 17; j++ {
-			state[j] = uapi.Xor(state[j], uapi.ValueOf(paddedPreImage[i+j]))
-		}
-		state = keccakf.Permute(uapi, state)
-	}
-	keyHash := state[:4]
-	keyHashBits := make([]frontend.Variable, 0)
-	for i := 0; i < len(keyHash); i++ {
-		for j := 0; j < len(keyHash[i]); j++ {
-			//api.Println(keyHash[i][j].Val, api.ToBinary(keyHash[i][j].Val, 8))
-			keyHashBits = append(keyHashBits, api.ToBinary(keyHash[i][j].Val, 8)...) // little-endian
+	for i := 0; i < 5; i++ {
+		for j := 0; j < 5; j++ {
+			for l := 0; l < 64; l++ {
+				xr := api.Xor(b[(i+4)%5][l], b[(i+1)%5][(l+63)%64])
+				circuit.block[(i+j*5)*64+l] = api.Xor(circuit.block[(i+j*5)*64+l], xr)
+			}
 		}
 	}
-	if len(keyHashBits) != 256 {
-		fmt.Println(len(keyHashBits))
-		panic(fmt.Errorf("len(keyHashBytes) != 256"))
-	}
-
-	// transform to [32]byte
-	keyHashBytes := make([]frontend.Variable, 32)
-	for i := 0; i < 32; i++ {
-		index := i * 8
-		keyHashBytes[i] = api.FromBinary(keyHashBits[index : index+8]...) // little-endian
-		//api.Println(keyHashBytes[i], keyHashBits[index:index+8])
-	}
-	return keyHashBytes
 }
 
-func padWith0x1(api frontend.API, i1 frontend.Variable, pos int) frontend.Variable {
-	lastUint64Binary := api.ToBinary(i1, 64)
-	lastUint64Binary[(pos)*8] = 1
-	return api.FromBinary(lastUint64Binary...)
+func (circuit *Keccak256) rho_and_phi(api frontend.API) {
+	t := make([]frontend.Variable, 64)
+	for i := 0; i < 64; i++ {
+		t[i] = circuit.block[64+i]
+	}
+	for i := 0; i < 24; i++ {
+		b := make([]frontend.Variable, 64)
+		for j := 0; j < 64; j++ {
+			b[j] = circuit.block[pi[i]*64+j]
+		}
+		for j := 0; j < 64; j++ {
+			circuit.block[pi[i]*64+j] = t[(j+64-rho[i])%64]
+		}
+		for j := 0; j < 64; j++ {
+			t[j] = b[j]
+		}
+	}
+}
+
+func (circuit *Keccak256) chi(api frontend.API) {
+	for j := 0; j < 5; j++ {
+		b := make([][]frontend.Variable, 5)
+		for i := 0; i < 5; i++ {
+			b[i] = make([]frontend.Variable, 64)
+			for l := 0; l < 64; l++ {
+				b[i][l] = circuit.block[(i+j*5)*64+l]
+			}
+		}
+		for i := 0; i < 5; i++ {
+			for l := 0; l < 64; l++ {
+				nt_1 := api.Xor(b[(i+1)%5][l], 1)
+				and_1 := api.Mul(nt_1, b[(i+2)%5][l])
+				circuit.block[(i+j*5)*64+l] = api.Xor(b[i][l], and_1)
+			}
+		}
+	}
+}
+
+func (circuit *Keccak256) iota(api frontend.API, round int) {
+	for l := 0; l < 64; l++ {
+		circuit.block[l] = api.Xor(circuit.block[l], ((RC[round] >> l) & 1))
+	}
+}
+
+func (circuit *Keccak256) keccakPermute(api frontend.API) {
+	for i := 0; i < 24; i++ {
+		circuit.theta(api)
+		circuit.rho_and_phi(api)
+		circuit.chi(api)
+		circuit.iota(api, i)
+	}
+}
+
+func (circuit *Keccak256) xorIn(api frontend.API, inputOffset int, len int) {
+	for i := 0; i < len; i++ {
+		circuit.block[i] = api.Xor(circuit.block[i], circuit.InputVariables[i+inputOffset])
+	}
+}
+
+func (circuit *Keccak256) absorb(api frontend.API) {
+	sz := len(circuit.InputVariables)
+	offset := 0
+	for sz >= rate {
+		circuit.xorIn(api, offset, rate)
+		circuit.keccakPermute(api)
+		offset += rate
+		sz -= rate
+	}
+	circuit.block[sz] = api.Xor(circuit.block[sz], 1)
+	circuit.block[rate-1] = api.Xor(circuit.block[rate-1], 1)
+	circuit.xorIn(api, offset, sz)
+	circuit.keccakPermute(api)
+}
+
+func (circuit *Keccak256) Compute(preImage []frontend.Variable) ([32]frontend.Variable, error) {
+	api := circuit.api
+	inputs := make([]frontend.Variable, 0)
+	for i := 0; i < len(preImage); i++ {
+		inputs = append(inputs, api.ToBinary(preImage[i], 8)...)
+	}
+	circuit.InputVariables = inputs
+
+	circuit.block = make([]frontend.Variable, blockWidth)
+	for i := 0; i < blockWidth; i++ {
+		circuit.block[i] = 0
+	}
+
+	circuit.absorb(api)
+	bytesOutput := make([]frontend.Variable, 32)
+	for i := 0; i < 32; i++ {
+		bytesOutput[i] = api.FromBinary(circuit.block[i*8 : (i+1)*8]...)
+	}
+	outputs := [32]frontend.Variable{}
+	for i := 0; i < 32; i++ {
+		outputs[i] = api.FromBinary(circuit.block[i*8 : (i+1)*8]...)
+	}
+
+	return outputs, nil
 }

@@ -215,7 +215,7 @@ func (c *Keccak256UndeterminedChecker) Define(api frontend.API) error {
 			preImage = append(preImage, slice.Variables...)
 		}
 		kecczk256 := NewKeccak256(api)
-		computeHash := kecczk256.Compute(preImage)
+		computeHash, err := kecczk256.Compute(preImage)
 		if err != nil {
 			return nil, err
 		}

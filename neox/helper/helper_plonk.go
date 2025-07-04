@@ -200,17 +200,6 @@ func ExportContract(vk plonk.VerifyingKey, path string) error {
 }
 
 /**
- * Function: GetHash
- * @Description: get data hash
- * @param data: data
- * @return []byte: hash
- */
-func GetHash(data []byte) []byte {
-	hash := sha256.Sum256(data)
-	return hash[:]
-}
-
-/**
  * Function: GetContractInput
  * @Description: get the data submitted to the chain
  * @param proof: zk proof
