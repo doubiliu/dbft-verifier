@@ -18,6 +18,7 @@ import (
 	"github.com/txhsl/neox-dbft-verifier/helper"
 	"math/big"
 	"testing"
+	"time"
 )
 
 func TestVerifyCircuit(t *testing.T) {
@@ -99,7 +100,7 @@ func TestVerifyCircuit(t *testing.T) {
 	hash, _ := bls12381.HashToG2(data, BLSDomain)
 	ToG2Hash := make([]frontend.Variable, len(hash.Bytes()))
 	for i := 0; i < len(ToG2Hash); i++ {
-		ToG2Hash[i] = data[i]
+		ToG2Hash[i] = hash.Bytes()[i]
 	}
 
 	rlpHashVerifyCcs, err := helper.ReadCCS("rlphash_css")
@@ -120,10 +121,13 @@ func TestVerifyCircuit(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+	start := time.Now()
 	rlpHashVerifyProof, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, &rlpHashVerifyPk, &rlpHashVerifyVk, parent)
 	if err != nil {
 		panic(err)
 	}
+	elapsed := time.Since(start)
+	fmt.Printf("RLP证明计算操作耗时：%s\n", elapsed)
 	rlpProof, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](*rlpHashVerifyProof)
 	if err != nil {
 		panic(err)
@@ -146,10 +150,13 @@ func TestVerifyCircuit(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+	start = time.Now()
 	tog2HashVerifyProof, _, err := ComputeToG2HashProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), toG2HashVerifyCcs, &toG2HashVerifyPk, &toG2HashVerifyVk, current)
 	if err != nil {
 		panic(err)
 	}
+	elapsed = time.Since(start)
+	fmt.Printf("toG2Hash证明计算操作耗时：%s\n", elapsed)
 	g2Proof, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](*tog2HashVerifyProof)
 	if err != nil {
 		panic(err)
@@ -215,6 +222,8 @@ func ComputeRLPProof(field, outer *big.Int, innerccs constraint.ConstraintSystem
 	input := make([]frontend.Variable, 0)
 	input = append(input, RLPHash...)
 	input = append(input, serializeHeader...)
+	fmt.Println("rlpInput-out-circuit:")
+	fmt.Println(input)
 	innerAssignment := &HeaderRLPEncodeVerifyWrapper{
 		input,
 	}
