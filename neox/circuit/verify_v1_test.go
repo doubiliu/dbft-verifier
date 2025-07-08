@@ -26,58 +26,58 @@ func TestVerifyCircuit(t *testing.T) {
 	parent := new(types.Header)
 	err := parent.UnmarshalJSON([]byte(
 		`{
-    "baseFeePerGas": "0x4a817c800",
-    "difficulty": "0x2",
-    "extraData": "0x0101072bc064323344cba6d63cad4ca88afbea585fc612919e3e351f457ea3704f76a5b5119bdcba3022c77f07b13bea98239781492b075fb8a1dff6895377dcd5251c3134660c973244d84101814ad14fa9a6605298b06a5c70c969ee5c1357236cbe9b7b65ee59f567e95d6a8fe0966175676170c0ecf174ef6ad701574d7b7d1a099068d29ac7662e20a2ae74898d19b93966d89314946745860d47c59c38208f83b50013414845cb5706840426f45b2c",
-    "gasLimit": "0x1c9c380",
-    "gasUsed": "0x0",
-    "hash": "0xecd8bd1c514fd33d9e01184783af6f2dd58f3a213b294fe8019aab5271140633",
-    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-    "miner": "0x1212000000000000000000000000000000000003",
-    "mixHash": "0xc1a8ea569ae7daff411094c088d4dd58cd439d241d9c31af61a537c6505761a5",
-    "nonce": "0x0000000000000005",
-    "number": "0x2970d9",
-    "parentHash": "0x59db04b079ab47dde8736b231469db4e4a1ca2c9fc8e251bf41cf3c336facefe",
-    "receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-    "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-    "size": "0x2db",
-    "stateRoot": "0xf675a08553de3363c8abc70879a9cc6ca6c6be517ae21a7f6601835fb6181ff9",
-    "timestamp": "0x680b3b51",
-    "totalDifficulty": "0x5023a5",
-    "transactions": [],
-    "transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-    "uncles": [],
-    "withdrawals": [],
-    "withdrawalsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
-}`,
+			"baseFeePerGas": "0x4a817c800",
+			"difficulty": "0x2",
+			"extraData": "0x0201072bc064323344cba6d63cad4ca88afbea585fc612919e3e351f457ea3704f76976d77c5cdebcce0c6e39cdd29d21ac54ad911720cf7fd28d7806515816587b95c6fc14588d93c564bd46ade8affac53aa75d3d4d2abcbc7363ead5d7ada2e9e2de20a40c8d78d440f23f36bd82638cad0039ce46bcfc86c380b643ed9ae38a801d9097e699a9b30306289388bedbc50fabb3633ec8e9d8596c5800d0dc6f3859c766170fb406915574fa81827a0c3d6",
+			"gasLimit": "0x1c9c380",
+			"gasUsed": "0x0",
+			"hash": "0x70b8d2a8371cf83d94012459876d326fe236141ea2d8c04ccaa7ba5d4dad19a4",
+			"logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+			"miner": "0x1212000000000000000000000000000000000003",
+			"mixHash": "0x8ff779018b306c26cf13c12aa70002ecb98e553f725049d81bfca73ca5141ec9",
+			"nonce": "0x0000000000000002",
+			"number": "0x3aac81",
+			"parentHash": "0xa71dba8853d9a78570c223273b1baa54f1940da2ab6c65cec4a8e055b18a9e91",
+			"receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+			"size": "0x2db",
+			"stateRoot": "0x73fa78a8689580ed7319392cb2f9d062acece70f938f9b9af6578e15c6ee4aeb",
+			"timestamp": "0x6862306b",
+			"totalDifficulty": "0x729861",
+			"transactions": [],
+			"transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"uncles": [],
+			"withdrawals": [],
+			"withdrawalsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+		}`,
 	))
 	current := new(types.Header)
 	err = current.UnmarshalJSON([]byte(
 		`{
-    "baseFeePerGas": "0x4a817c800",
-    "difficulty": "0x2",
-    "extraData": "0x0101072bc064323344cba6d63cad4ca88afbea585fc612919e3e351f457ea3704f76a5b5119bdcba3022c77f07b13bea98239781492b075fb8a1dff6895377dcd5251c3134660c973244d84101814ad14fa9a2267aebbca32f4f307ffe32c1d387b78585335d413747522953d7eccdfdb54fec71d9c8d28ce456ce51fadbf3dd059a15c42c964250c71107c987966a23d49f086cadf981f812d8deab403047cd8b8438fc8ca79cb6ee9290b3780f80007838",
-    "gasLimit": "0x1c9c380",
-    "gasUsed": "0x0",
-    "hash": "0x72273a91d87952260ff37c86839d69d1e1b6d3bbfc6e00a55198950bbcf182dc",
-    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-    "miner": "0x1212000000000000000000000000000000000003",
-    "mixHash": "0xc1a8ea569ae7daff411094c088d4dd58cd439d241d9c31af61a537c6505761a5",
-    "nonce": "0x0000000000000006",
-    "number": "0x2970da",
-    "parentHash": "0xecd8bd1c514fd33d9e01184783af6f2dd58f3a213b294fe8019aab5271140633",
-    "receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-    "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-    "size": "0x2db",
-    "stateRoot": "0xf675a08553de3363c8abc70879a9cc6ca6c6be517ae21a7f6601835fb6181ff9",
-    "timestamp": "0x680b3b56",
-    "totalDifficulty": "0x5023a7",
-    "transactions": [],
-    "transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-    "uncles": [],
-    "withdrawals": [],
-    "withdrawalsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
-}`,
+			"baseFeePerGas": "0x4a817c800",
+			"difficulty": "0x2",
+			"extraData": "0x0201072bc064323344cba6d63cad4ca88afbea585fc612919e3e351f457ea3704f76976d77c5cdebcce0c6e39cdd29d21ac54ad911720cf7fd28d7806515816587b95c6fc14588d93c564bd46ade8affac53b509b7477d85c870d635371a054713ecff352b98261bac920963a7891d86537c8f3ea9f37ebf9bc7a325129f4b9bc47e064bd1ae1f588f62df3613b81c50680d81d7a754262d4027919c827834ce3676997a15b4adea6b387171afb7c65a13a8",
+			"gasLimit": "0x1c9c380",
+			"gasUsed": "0x0",
+			"hash": "0x5ee3e44dbf6a87b798534efb870f63957c2d5b2ccda1b7360ea0159a403e738b",
+			"logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+			"miner": "0x1212000000000000000000000000000000000003",
+			"mixHash": "0x8ff779018b306c26cf13c12aa70002ecb98e553f725049d81bfca73ca5141ec9",
+			"nonce": "0x0000000000000003",
+			"number": "0x3aac82",
+			"parentHash": "0x70b8d2a8371cf83d94012459876d326fe236141ea2d8c04ccaa7ba5d4dad19a4",
+			"receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+			"size": "0x2db",
+			"stateRoot": "0x73fa78a8689580ed7319392cb2f9d062acece70f938f9b9af6578e15c6ee4aeb",
+			"timestamp": "0x68623070",
+			"totalDifficulty": "0x729863",
+			"transactions": [],
+			"transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"uncles": [],
+			"withdrawals": [],
+			"withdrawalsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+		}`,
 	))
 	pparent := GetHeaderParamter(parent)
 	pcurrent := GetHeaderParamter(current)
@@ -98,11 +98,12 @@ func TestVerifyCircuit(t *testing.T) {
 		panic(err)
 	}
 	hash, _ := bls12381.HashToG2(data, BLSDomain)
-	ToG2Hash := make([]frontend.Variable, len(hash.Bytes()))
+	hashBytes := hash.Bytes()
+	var ToG2Hash [96]frontend.Variable
 	for i := 0; i < len(ToG2Hash); i++ {
-		ToG2Hash[i] = hash.Bytes()[i]
+		ToG2Hash[i] = hashBytes[i]
 	}
-
+	//slices.Reverse(ToG2Hash)
 	rlpHashVerifyCcs, err := helper.ReadCCS("rlphash_css")
 	if err != nil {
 		panic(err)
@@ -122,13 +123,24 @@ func TestVerifyCircuit(t *testing.T) {
 		panic(err)
 	}
 	start := time.Now()
-	rlpHashVerifyProof, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, &rlpHashVerifyPk, &rlpHashVerifyVk, parent)
+	rlpHashVerifyProof1, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, &rlpHashVerifyPk, &rlpHashVerifyVk, parent)
 	if err != nil {
 		panic(err)
 	}
 	elapsed := time.Since(start)
-	fmt.Printf("RLP证明计算操作耗时：%s\n", elapsed)
-	rlpProof, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](*rlpHashVerifyProof)
+	fmt.Printf("Parent RLP证明计算操作耗时：%s\n", elapsed)
+	rlpProof1, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](*rlpHashVerifyProof1)
+	if err != nil {
+		panic(err)
+	}
+	start = time.Now()
+	rlpHashVerifyProof2, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, &rlpHashVerifyPk, &rlpHashVerifyVk, current)
+	if err != nil {
+		panic(err)
+	}
+	elapsed = time.Since(start)
+	fmt.Printf("Current RLP证明计算操作耗时：%s\n", elapsed)
+	rlpProof2, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](*rlpHashVerifyProof2)
 	if err != nil {
 		panic(err)
 	}
@@ -161,25 +173,52 @@ func TestVerifyCircuit(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+
+	pdata, err := encodeHeader(parent)
+	if err != nil {
+		panic(err)
+	}
+	pdata = common.BytesToHash(crypto.Keccak256(pdata)).Bytes()
+	//fmt.Printf("%v\n", data)
+	var ParentHash [32]frontend.Variable
+	for i := 0; i < len(ParentHash); i++ {
+		ParentHash[i] = pdata[i]
+	}
+	cdata, err := encodeHeader(current)
+	if err != nil {
+		panic(err)
+	}
+	cdata = common.BytesToHash(crypto.Keccak256(cdata)).Bytes()
+	//fmt.Printf("%v\n", data)
+	var CurrentHash [32]frontend.Variable
+	for i := 0; i < len(CurrentHash); i++ {
+		CurrentHash[i] = cdata[i]
+	}
+	var MixDigest [32]frontend.Variable
+	for i := 0; i < len(MixDigest); i++ {
+		MixDigest[i] = current.MixDigest[i]
+	}
+
 	circuit := VerifyWrapper[sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
 		Parent:        pparent,
 		Current:       pcurrent,
 		RLPHashVk:     rlpKey,
-		RLPHashProof:  stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashVerifyCcs),
+		RLPHashProof1: stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashVerifyCcs),
+		RLPHashProof2: stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashVerifyCcs),
 		ToG2HashVk:    g2Key,
 		ToG2HashProof: stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](toG2HashVerifyCcs),
-		ToG2Hash:      make([]frontend.Variable, 96),
 	}
 
 	assignment := VerifyWrapper[sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
 		Parent:        pparent,
 		Current:       pcurrent,
-		RLPHashProof:  rlpProof,
+		RLPHashProof1: rlpProof1,
+		RLPHashProof2: rlpProof2,
 		ToG2HashProof: g2Proof,
 		ToG2Hash:      ToG2Hash,
-		/*		Hash:    sw_bls12381.NewG2Affine(hash),
-				Sig:     sw_bls12381.NewG2Affine(sig),
-				Pub:     sw_bls12381.NewG1Affine(pub),*/
+		ParentHash:    ParentHash,
+		CurrentHash:   CurrentHash,
+		MixDigest:     MixDigest,
 	}
 	//witness, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
 	err = test.IsSolved(&circuit, &assignment, ecc.BN254.ScalarField())

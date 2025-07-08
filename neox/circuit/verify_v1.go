@@ -1,6 +1,7 @@
 package circuit
 
 import (
+	"fmt"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/algebra"
 	"github.com/consensys/gnark/std/algebra/emulated/sw_bls12381"
@@ -11,24 +12,23 @@ import (
 )
 
 type VerifyWrapper[FR emulated.FieldParams, G1El algebra.G1ElementT, G2El algebra.G2ElementT, GtEl algebra.GtElementT] struct {
-	Current HeaderParameters
-	Parent  HeaderParameters
-	/*	Hash         sw_bls12381.G2Affine
-		Sig          sw_bls12381.G2Affine
-		Pub          sw_bls12381.G1Affine*/
-	RLPHashProof groth16.Proof[G1El, G2El]              `gnark:",secret"`
-	RLPHashVk    groth16.VerifyingKey[G1El, G2El, GtEl] `gnark:"-"` // CircuitVerifyKeys is related to the srsl and ccs
-	//ParentHash   [32]frontend.Variable
+	Current       HeaderParameters
+	Parent        HeaderParameters
+	RLPHashProof1 groth16.Proof[G1El, G2El]              `gnark:",secret"`
+	RLPHashProof2 groth16.Proof[G1El, G2El]              `gnark:",secret"`
+	RLPHashVk     groth16.VerifyingKey[G1El, G2El, GtEl] `gnark:"-"`
 	ToG2HashProof groth16.Proof[G1El, G2El]              `gnark:",secret"`
-	ToG2HashVk    groth16.VerifyingKey[G1El, G2El, GtEl] `gnark:"-"` // CircuitVerifyKeys is related to the srsl and ccs
-	ToG2Hash      []frontend.Variable
+	ToG2HashVk    groth16.VerifyingKey[G1El, G2El, GtEl] `gnark:"-"`
+	ToG2Hash      [96]frontend.Variable                  `gnark:",secret"`
+	ParentHash    [32]frontend.Variable                  `gnark:",public"`
+	CurrentHash   [32]frontend.Variable                  `gnark:",public"`
+	MixDigest     [32]frontend.Variable                  `gnark:",public"`
 }
 
 // Define declares the circuit's constraints
 func (c *VerifyWrapper[FR, G1El, G2El, GtEl]) Define(api frontend.API) error {
 	verify := NewVerify[FR, G1El, G2El, GtEl](api)
-	//verify.Verify(api, c.Current, c.Parent, c.Hash, c.ParentHash)
-	verify.Verify2(api, c.Current, c.Parent, c.RLPHashProof, c.RLPHashVk, c.ToG2HashProof, c.ToG2HashVk, c.ToG2Hash)
+	verify.Verify(api, c.Current, c.Parent, c.ParentHash[:], c.CurrentHash[:], c.MixDigest[:], c.RLPHashProof1, c.RLPHashProof2, c.RLPHashVk, c.ToG2HashProof, c.ToG2HashVk, c.ToG2Hash[:])
 	return nil
 }
 
@@ -40,131 +40,7 @@ type Verify[FR emulated.FieldParams, G1El algebra.G1ElementT, G2El algebra.G2Ele
 	api frontend.API
 }
 
-func (verify *Verify[FR, G1El, G2El, GtEl]) Verify(api frontend.API, current HeaderParameters, parent HeaderParameters, hash sw_bls12381.G2Affine) {
-	// Check basic
-	headerencode := NewHeaderEncode(api)
-	parentHash := headerencode.RlpHash(api, parent)
-	for i := 0; i < len(current.ParentHash); i++ {
-		api.AssertIsEqual(current.ParentHash[i], parentHash[i])
-	}
-	//check current number=parent+1
-	cn, err := BytesToIntVarible(api, current.Number[:])
-	pn, err := BytesToIntVarible(api, parent.Number[:])
-	api.AssertIsEqual(cn, api.Add(pn, frontend.Variable(1)))
-
-	//compre time ,current.Time should bigger than parent
-	ct, err := BytesToIntVarible(api, current.Time[:])
-	pt, err := BytesToIntVarible(api, parent.Time[:])
-	cmp := api.Cmp(ct, pt)
-	api.AssertIsEqual(cmp, frontend.Variable(1))
-
-	expectConsensus := parent.MixDigest
-	extraLength := len(current.Extra)
-	api.AssertIsLessOrEqual(2, frontend.Variable(extraLength))
-	v0 := current.Extra[0]
-	//Extra[0] should be ExtraV1 | ExtraV2
-	rangeCheck(api, v0, []frontend.Variable{frontend.Variable(ExtraV1), frontend.Variable(ExtraV2)})
-	v1 := current.Extra[1]
-	//Extra[1] should be ExtraV1ThresholdScheme
-	api.AssertIsEqual(v1, frontend.Variable(ExtraV1ThresholdScheme))
-	// Check format
-	api.AssertIsEqual(frontend.Variable(extraLength), frontend.Variable(HashableExtraV1Len+BLSPublicKeyLen+BLSSignatureLen))
-	// Get global public key and sig
-	pubBytes := current.Extra[HashableExtraV1Len : HashableExtraV1Len+BLSPublicKeyLen]
-	sigBytes := current.Extra[HashableExtraV1Len+BLSPublicKeyLen : HashableExtraV1Len+BLSPublicKeyLen+BLSSignatureLen]
-	g1, err := sw_bls12381.NewG1(api)
-	if err != nil {
-		return
-	}
-	g2, err := sw_bls12381.NewG2(api)
-	if err != nil {
-		return
-	}
-	uapi, err := uints.New[uints.U32](api)
-	if err != nil {
-		return
-	}
-	pubU8s := make([]uints.U8, len(pubBytes))
-	for i := 0; i < len(pubBytes); i++ {
-		pubU8s[i] = uapi.ByteValueOf(pubBytes[i])
-	}
-	pk, err := g1.FromCompressedBytes(pubU8s)
-	if err != nil {
-		return
-	}
-	sigU8s := make([]uints.U8, len(sigBytes))
-	for i := 0; i < len(sigBytes); i++ {
-		sigU8s[i] = uapi.ByteValueOf(sigBytes[i])
-	}
-	sig, err := g2.FromCompressedBytes(sigU8s)
-	if err != nil {
-		return
-	}
-
-	// Verify global public key
-	keccak256 := NewKeccak256(api)
-	exactConsensus, err := keccak256.Compute(pubBytes)
-	for i := 0; i < len(expectConsensus); i++ {
-		api.AssertIsEqual(exactConsensus[i], expectConsensus[i])
-	}
-	// Get seal hash
-	headencode := NewHeaderEncode(api)
-	hashBytes := headencode.HashToG2(api, current)
-	g2.AssertIsOnG2(&hash)
-	marshalHashbits := g2.Marshal(hash)
-	marshalHash := make([]frontend.Variable, len(marshalHashbits)/8)
-	for i := 0; i < len(hashBytes); i++ {
-		tbits := marshalHashbits[i*8 : (i+1)*8]
-		treversebits := make([]frontend.Variable, len(tbits))
-		for j := 0; j < len(tbits); j++ {
-			treversebits[j] = tbits[len(tbits)-j-1]
-		}
-		marshalHash[i] = api.FromBinary(treversebits...)
-	}
-	for i := 0; i < len(hashBytes); i++ {
-		api.AssertIsEqual(marshalHash[i], hashBytes[i])
-	}
-	/*	data := headencode.EncodeSigHeader(api, current)
-		u8data := make([]uints.U8, len(data))
-		uapi, err := uints.New[uints.U32](api)
-		if err != nil {
-			panic(err)
-		}
-		for i := 0; i < len(data); i++ {
-			u8data[i] = uapi.ByteValueOf(data[i])
-		}
-		_, err = g2.HashToG2(api, u8data, BLSDomain)
-		if err != nil {
-			panic(err)
-		}
-		g2.AssertIsOnG2(&hash)
-		hashBits = g2.MarshalG2(hash)
-		hashBytes := make([]frontend.Variable, len(hashBits)/8)
-		for i := 0; i < len(pkBytes); i++ {
-			hashBytes[i] = api.FromBinary(hashBits[i*8 : (i+1)*8]...)
-		}*/
-	//check
-	//ihash=hashBytes
-
-	/*	hash, _ := bls12381.HashToG2(data, BLSDomain)*/
-	// Negate the sig in V1,current.Extra[0] == ExtraV1
-	//negSig := g2.Neg(&sig)
-	/*	flag := api.Cmp(v0, frontend.Variable(ExtraV1))
-
-		r := api.Select(flag, sig, negSig)*/
-	// Verify sig
-	blsVerify := NewBlsSigVerify(api)
-	blsVerify.Verify(api, &hash, sig, pk)
-
-	//最后检查外部hash1==current hash
-	//最后检查外部hash2==parent hash
-	/*	currentHash := headerencode.RlpHash(api, current)
-		for i := 0; i < len(currentHash); i++ {
-			api.AssertIsEqual(c.currentHash[i], currentHash[i])
-		}*/
-}
-
-func (verify *Verify[FR, G1El, G2El, GtEl]) Verify2(api frontend.API, current HeaderParameters, parent HeaderParameters, RLPHashProof groth16.Proof[G1El, G2El], RLPHashVk groth16.VerifyingKey[G1El, G2El, GtEl], ToG2HashProof groth16.Proof[G1El, G2El], ToG2HashVk groth16.VerifyingKey[G1El, G2El, GtEl], ToG2Hash []frontend.Variable) {
+func (verify *Verify[FR, G1El, G2El, GtEl]) Verify(api frontend.API, current HeaderParameters, parent HeaderParameters, parentHash []frontend.Variable, currentHash []frontend.Variable, MixDigest []frontend.Variable, RLPHashProof1 groth16.Proof[G1El, G2El], RLPHashProof2 groth16.Proof[G1El, G2El], RLPHashVk groth16.VerifyingKey[G1El, G2El, GtEl], ToG2HashProof groth16.Proof[G1El, G2El], ToG2HashVk groth16.VerifyingKey[G1El, G2El, GtEl], ToG2Hash []frontend.Variable) {
 	field, err := emulated.NewField[FR](api)
 	if err != nil {
 		panic(err)
@@ -177,28 +53,47 @@ func (verify *Verify[FR, G1El, G2El, GtEl]) Verify2(api frontend.API, current He
 	serializeCHeader := Serialize(current)
 	serializePHeader := Serialize(parent)
 	//to verify parentHash=rlpencode(parent header) in sub-circuit
-	parentHash := current.ParentHash
-	rlpverifyInput := make([]frontend.Variable, 0)
-	rlpverifyInput = append(rlpverifyInput, parentHash[:]...)
-	rlpverifyInput = append(rlpverifyInput, serializePHeader...)
-	api.Println("rlpInput-in-circuit:")
-	api.Println(rlpverifyInput)
-	rlpverifyInputElements := make([]emulated.Element[FR], len(rlpverifyInput))
-	for i := 0; i < len(rlpverifyInputElements); i++ {
-		bits := bits.ToBinary(api, rlpverifyInput[i])
-		rlpverifyInputElements[i] = *field.FromBits(bits...)
+	rlpverifyInput1 := make([]frontend.Variable, 0)
+	rlpverifyInput1 = append(rlpverifyInput1, parentHash[:]...)
+	rlpverifyInput1 = append(rlpverifyInput1, serializePHeader...)
+	rlpverifyInputElements1 := make([]emulated.Element[FR], len(rlpverifyInput1))
+	for i := 0; i < len(rlpverifyInputElements1); i++ {
+		bits := bits.ToBinary(api, rlpverifyInput1[i])
+		rlpverifyInputElements1[i] = *field.FromBits(bits...)
 	}
 	verifier1, err := groth16.NewVerifier[FR, G1El, G2El, GtEl](api)
 	if err != nil {
 		panic(err)
 	}
-	err = verifier1.AssertProof(RLPHashVk, RLPHashProof, groth16.Witness[FR]{Public: rlpverifyInputElements}, groth16.WithCompleteArithmetic())
+	err = verifier1.AssertProof(RLPHashVk, RLPHashProof1, groth16.Witness[FR]{Public: rlpverifyInputElements1}, groth16.WithCompleteArithmetic())
 	if err != nil {
 		panic(err)
 	}
-	/*	for i := 0; i < len(current.ParentHash); i++ {
-		api.AssertIsEqual(current.ParentHash[i], parentHashU8s[i])
-	}*/
+	//check parentHash=current.parentHash
+	for i := 0; i < len(parentHash); i++ {
+		api.AssertIsEqual(parentHash[i], current.ParentHash[i])
+	}
+	//to verify currenttHash=rlpencode(current header) in sub-circuit
+	rlpverifyInput2 := make([]frontend.Variable, 0)
+	rlpverifyInput2 = append(rlpverifyInput2, currentHash[:]...)
+	rlpverifyInput2 = append(rlpverifyInput2, serializeCHeader...)
+	rlpverifyInputElements2 := make([]emulated.Element[FR], len(rlpverifyInput2))
+	for i := 0; i < len(rlpverifyInputElements2); i++ {
+		bits := bits.ToBinary(api, rlpverifyInput2[i])
+		rlpverifyInputElements2[i] = *field.FromBits(bits...)
+	}
+	verifier2, err := groth16.NewVerifier[FR, G1El, G2El, GtEl](api)
+	if err != nil {
+		panic(err)
+	}
+	err = verifier2.AssertProof(RLPHashVk, RLPHashProof2, groth16.Witness[FR]{Public: rlpverifyInputElements2}, groth16.WithCompleteArithmetic())
+	if err != nil {
+		panic(err)
+	}
+	//check MixDigest
+	for i := 0; i < len(current.MixDigest); i++ {
+		api.AssertIsEqual(MixDigest[i], current.MixDigest[i])
+	}
 	//check current number=parent+1
 	cn, err := BytesToIntVarible(api, current.Number[:])
 	pn, err := BytesToIntVarible(api, parent.Number[:])
@@ -225,11 +120,11 @@ func (verify *Verify[FR, G1El, G2El, GtEl]) Verify2(api frontend.API, current He
 	sigBytes := current.Extra[HashableExtraV1Len+BLSPublicKeyLen : HashableExtraV1Len+BLSPublicKeyLen+BLSSignatureLen]
 	g1, err := sw_bls12381.NewG1(api)
 	if err != nil {
-		return
+		panic(err)
 	}
 	g2, err := sw_bls12381.NewG2(api)
 	if err != nil {
-		return
+		panic(err)
 	}
 	pubU8s := make([]uints.U8, len(pubBytes))
 	for i := 0; i < len(pubBytes); i++ {
@@ -237,7 +132,7 @@ func (verify *Verify[FR, G1El, G2El, GtEl]) Verify2(api frontend.API, current He
 	}
 	pk, err := g1.FromCompressedBytes(pubU8s)
 	if err != nil {
-		return
+		panic(err)
 	}
 	sigU8s := make([]uints.U8, len(sigBytes))
 	for i := 0; i < len(sigBytes); i++ {
@@ -245,7 +140,7 @@ func (verify *Verify[FR, G1El, G2El, GtEl]) Verify2(api frontend.API, current He
 	}
 	sig, err := g2.FromCompressedBytes(sigU8s)
 	if err != nil {
-		return
+		panic(err)
 	}
 	// Verify global public key
 	keccak256 := NewKeccak256(api)
@@ -265,11 +160,11 @@ func (verify *Verify[FR, G1El, G2El, GtEl]) Verify2(api frontend.API, current He
 		bits := bits.ToBinary(api, toG2HashVerifyInput[i])
 		toG2HashVerifyInputElements[i] = *field.FromBits(bits...)
 	}
-	verifier2, err := groth16.NewVerifier[FR, G1El, G2El, GtEl](api)
+	verifier3, err := groth16.NewVerifier[FR, G1El, G2El, GtEl](api)
 	if err != nil {
 		panic(err)
 	}
-	err = verifier2.AssertProof(ToG2HashVk, ToG2HashProof, groth16.Witness[FR]{Public: toG2HashVerifyInputElements}, groth16.WithCompleteArithmetic())
+	err = verifier3.AssertProof(ToG2HashVk, ToG2HashProof, groth16.Witness[FR]{Public: toG2HashVerifyInputElements}, groth16.WithCompleteArithmetic())
 	if err != nil {
 		panic(err)
 	}
@@ -277,27 +172,29 @@ func (verify *Verify[FR, G1El, G2El, GtEl]) Verify2(api frontend.API, current He
 	for i := 0; i < len(ToG2Hash); i++ {
 		ToG2HashU8s[i] = uapi.ByteValueOf(ToG2Hash[i])
 	}
-	// get seal hash
+	//get seal hash
 	toG2HashPoint, err := g2.FromCompressedBytes(ToG2HashU8s)
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println(toG2HashPoint)
 	// Negate the sig in V1,current.Extra[0] == ExtraV1
-	negSig := g2.Neg(toG2HashPoint)
-	negSigBytes, err := g2.ToCompressedBytes(*negSig)
+	negSig := g2.Neg(*toG2HashPoint)
+	negSigBytes, err := g2.ToCompressedBytes(negSig)
 	if err != nil {
-		return
+		panic(err)
 	}
 	flag := api.Select(api.IsZero(api.Sub(v0, frontend.Variable(ExtraV1))), frontend.Variable(1), frontend.Variable(0))
 	negflag := api.Sub(frontend.Variable(1), flag)
 	ToG2HashBits := make([]frontend.Variable, 0)
 	for i := 0; i < len(ToG2Hash); i++ {
-		tempbits := bits.ToBinary(api, ToG2Hash)
+		tempbits := bits.ToBinary(api, ToG2Hash[i], bits.WithNbDigits(8))
 		ToG2HashBits = append(ToG2HashBits, tempbits...)
 	}
+
 	negHashBits := make([]frontend.Variable, 0)
 	for i := 0; i < len(negSigBytes); i++ {
-		tempbits := bits.ToBinary(api, negSigBytes)
+		tempbits := bits.ToBinary(api, negSigBytes[i].Val, bits.WithNbDigits(8))
 		negHashBits = append(negHashBits, tempbits...)
 	}
 	resultHashBits := make([]frontend.Variable, len(negHashBits))
@@ -316,11 +213,6 @@ func (verify *Verify[FR, G1El, G2El, GtEl]) Verify2(api frontend.API, current He
 	//verify bls sig
 	blsVerify := NewBlsSigVerify(api)
 	blsVerify.Verify(api, resultHash, sig, pk)
-	// verify parentHash=Hash(parent head),and currentHash=Hash(current Hash)
-	/*	currentHash := headerencode.RlpHash(api, current)
-		for i := 0; i < len(currentHash); i++ {
-			api.AssertIsEqual(c.currentHash[i], currentHash[i])
-		}*/
 }
 
 func BytesToIntVarible(api frontend.API, x []frontend.Variable) (frontend.Variable, error) {
