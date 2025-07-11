@@ -245,11 +245,8 @@ func (c *SliceApi) checkConcatInLittleEndian(concat PaddingSlice, slices ...Padd
 		}
 		partitions[i] = api.Add(lastNum, slices[len(slices)-1-i].Padding)
 	}
-	api.Println(concat.Slice)
 	api.AssertIsEqual(partitions[len(partitions)-1], length)
 	// check concat[partition_{n - 1}, partition_n) is 0
-	api.Println(partitions)
-	api.Println(selector.Slice(api, partitions[len(partitions)-2], partitions[len(partitions)-1], concat.Slice))
 	c.AssertIsZero(selector.Slice(api, partitions[len(partitions)-2], partitions[len(partitions)-1], concat.Slice))
 	for i := 0; i < len(slices); i++ {
 		var left, right frontend.Variable
@@ -258,12 +255,9 @@ func (c *SliceApi) checkConcatInLittleEndian(concat PaddingSlice, slices ...Padd
 		} else {
 			left, right = partitions[i-1], partitions[i]
 		}
-		api.Println(left, right)
 		concatSlice := selector.Slice(api, left, right, concat.Slice)
-		api.Println(concatSlice)
 		// we should left shift partitions[i + 1]
 		concatSlice = c.LeftShift(concatSlice, left)
-		api.Println(concatSlice)
 		c.AssertIsSame(concatSlice, slices[len(slices)-1-i].Slice)
 	}
 	return nil
@@ -301,7 +295,12 @@ func (s *PaddingSlice) Reverse(api frontend.API) PaddingSlice {
 		IsLittleEndian: !s.IsLittleEndian,
 	}
 }
-
+func (s *PaddingSlice) Last() frontend.Variable {
+	if s.IsLittleEndian {
+		return s.Slice[0]
+	}
+	return s.Slice[len(s.Slice)-1]
+}
 func (s *PaddingSlice) PaddingWithZero(api frontend.API, length int) PaddingSlice {
 	paddingLength := length - len(s.Slice) // zero number
 	sCopy := s.Clone()

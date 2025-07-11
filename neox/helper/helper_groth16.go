@@ -140,34 +140,34 @@ func ExportVerifyingKey(vk *groth16.VerifyingKey, path string) {
 }
 
 /**
- * Function: ReadCSS
+ * Function: ReadCCS
  * @Description: import r1cs file
  * @param path: r1cs file path
  */
-func ReadCSS(path string) (constraint.ConstraintSystem, error) {
-	css := new(cs.R1CS)
+func ReadCCS(path string) (constraint.ConstraintSystem, error) {
+	ccs := new(cs.R1CS)
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	_, err = css.ReadFrom(file)
+	_, err = ccs.ReadFrom(file)
 	if err != nil {
 		return nil, err
 	}
-	return css, nil
+	return ccs, nil
 }
 
 /**
- * Function: ExportCSS
+ * Function: ExportCCS
  * @Description: export r1cs file
  * @param css: r1cs
  */
-func ExportCSS(css constraint.ConstraintSystem, path string) {
+func ExportCCS(ccs constraint.ConstraintSystem, path string) {
 	file, err := os.Create(path)
 	if err != nil {
 		panic(err)
 	}
-	_, err = css.WriteTo(file)
+	_, err = ccs.WriteTo(file)
 	if err != nil {
 		panic(err)
 	}

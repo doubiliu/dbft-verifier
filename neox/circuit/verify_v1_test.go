@@ -79,9 +79,10 @@ func TestVerifyCircuit(t *testing.T) {
 			"withdrawalsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
 		}`,
 	))
-	pparent := GetHeaderParamter(parent)
-	pcurrent := GetHeaderParamter(current)
-
+	pparent, err := GetHeaderParamter(parent)
+	assert.NoError(err)
+	pcurrent, err := GetHeaderParamter(current)
+	assert.NoError(err)
 	pubBytes := current.Extra[HashableExtraV1Len : HashableExtraV1Len+BLSPublicKeyLen]
 	sigBytes := current.Extra[HashableExtraV1Len+BLSPublicKeyLen : HashableExtraV1Len+BLSPublicKeyLen+BLSSignatureLen]
 	var pub bls12381.G1Affine
@@ -93,7 +94,7 @@ func TestVerifyCircuit(t *testing.T) {
 	g1.Neg(&g1)
 	var sig bls12381.G2Affine
 	_, err = sig.SetBytes(sigBytes)
-	data, err := encodeSigHeader(current)
+	data, err := encodeHeader(current, true)
 	if err != nil {
 		panic(err)
 	}
@@ -174,7 +175,7 @@ func TestVerifyCircuit(t *testing.T) {
 		panic(err)
 	}
 
-	pdata, err := encodeHeader(parent)
+	pdata, err := encodeHeader(parent, false)
 	if err != nil {
 		panic(err)
 	}
@@ -184,7 +185,7 @@ func TestVerifyCircuit(t *testing.T) {
 	for i := 0; i < len(ParentHash); i++ {
 		ParentHash[i] = pdata[i]
 	}
-	cdata, err := encodeHeader(current)
+	cdata, err := encodeHeader(current, false)
 	if err != nil {
 		panic(err)
 	}
@@ -246,8 +247,11 @@ func TestVerifyCircuit(t *testing.T) {
 }
 
 func ComputeRLPProof(field, outer *big.Int, innerccs constraint.ConstraintSystem, innerPK *groth16.ProvingKey, innerVK *groth16.VerifyingKey, header *types.Header) (*groth16.Proof, witness.Witness, error) {
-	pheader := GetHeaderParamter(header)
-	data, err := encodeHeader(header)
+	pheader, err := GetHeaderParamter(header)
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := encodeHeader(header, false)
 	if err != nil {
 		panic(err)
 	}
@@ -257,14 +261,16 @@ func ComputeRLPProof(field, outer *big.Int, innerccs constraint.ConstraintSystem
 	for i := 0; i < len(RLPHash); i++ {
 		RLPHash[i] = data[i]
 	}
-	serializeHeader := Serialize(pheader)
+	serializeHeader := pheader.Serialize()
 	input := make([]frontend.Variable, 0)
 	input = append(input, RLPHash...)
 	input = append(input, serializeHeader...)
 	fmt.Println("rlpInput-out-circuit:")
 	fmt.Println(input)
+
 	innerAssignment := &HeaderRLPEncodeVerifyWrapper{
 		input,
+		header.Extra[0],
 	}
 	r1cs := innerccs.(*cs.R1CS)
 	innerWitness, err := frontend.NewWitness(innerAssignment, field)
@@ -288,8 +294,11 @@ func ComputeRLPProof(field, outer *big.Int, innerccs constraint.ConstraintSystem
 }
 
 func ComputeToG2HashProof(field, outer *big.Int, innerccs constraint.ConstraintSystem, innerPK *groth16.ProvingKey, innerVK *groth16.VerifyingKey, header *types.Header) (*groth16.Proof, witness.Witness, error) {
-	cheader := GetHeaderParamter(header)
-	data, err := encodeSigHeader(header)
+	cheader, err := GetHeaderParamter(header)
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := encodeHeader(header, false)
 	if err != nil {
 		panic(err)
 	}
@@ -302,7 +311,7 @@ func ComputeToG2HashProof(field, outer *big.Int, innerccs constraint.ConstraintS
 	for i := 0; i < len(ToG2Hash); i++ {
 		ToG2Hash[i] = hash.Bytes()[i]
 	}
-	serializeHeader := Serialize(cheader)
+	serializeHeader := cheader.Serialize()
 	input := make([]frontend.Variable, 0)
 	input = append(input, ToG2Hash...)
 	input = append(input, serializeHeader...)

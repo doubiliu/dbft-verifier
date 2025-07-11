@@ -145,41 +145,6 @@ func ExportPlonkVerifyingKey(vk plonk.VerifyingKey, path string) error {
 }
 
 /**
- * Function: ReadCCS
- * @Description: import r1cs file
- * @param path: r1cs file path
- */
-func ReadCCS(path string) (constraint.ConstraintSystem, error) {
-	ccs := new(cs.SparseR1CS)
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	_, err = ccs.ReadFrom(file)
-	if err != nil {
-		return nil, err
-	}
-	return ccs, nil
-}
-
-/**
- * Function: ExportCCS
- * @Description: export r1cs file
- * @param ccs: r1cs
- */
-func ExportCCS(ccs constraint.ConstraintSystem, path string) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	_, err = ccs.WriteTo(file)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-/**
  * Function: ExportContract
  * @Description: export solidity file
  * @param vk: verifying key
