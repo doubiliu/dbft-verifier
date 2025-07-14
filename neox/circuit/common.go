@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	bls12381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
 	"github.com/consensys/gnark/frontend"
 	"github.com/ethereum/go-ethereum/common"
@@ -115,7 +114,6 @@ func CompressBytes(api frontend.API, v []frontend.Variable) CompressedBytes {
 		}
 		res = append(res, api.FromBinary(bits...))
 	}
-	fmt.Println(len(v), len(res))
 	return CompressedBytes{
 		Variables: res,
 		Length:    len(v),
@@ -171,11 +169,11 @@ func (header *CompressHeaderParameters) Serialize() []frontend.Variable {
 	input = append(input, header.GasLimit)
 	input = append(input, header.GasUsed)
 	input = append(input, header.Time)
+	input = append(input, header.Extra.Variables...)
 	input = append(input, header.MixDigest[:]...)
 	input = append(input, header.Nonce)
 	input = append(input, header.BaseFee)
 	input = append(input, header.WithdrawalsHash[:]...)
-	input = append(input, header.Extra.Variables...)
 	return input
 }
 func (h *CompressHeaderParameters) Decompressed(api frontend.API) HeaderParameters {
@@ -262,6 +260,7 @@ func (header *HeaderParameters) Compress(api frontend.API) CompressHeaderParamet
 	h.GasLimit = ToCompressedU64(api, header.GasLimit)
 	h.GasUsed = ToCompressedU64(api, header.GasUsed)
 	h.Time = ToCompressedU64(api, header.Time)
+
 	h.Extra = CompressBytes(api, header.Extra)
 	h.MixDigest = ToCompressedHash(api, header.MixDigest)
 	h.Nonce = ToCompressedU64(api, header.Nonce)
@@ -274,23 +273,24 @@ func (header *HeaderParameters) Compress(api frontend.API) CompressHeaderParamet
 // NoSigHeader return a header which has a no-signature extra term
 func (header *HeaderParameters) NoSigHeader() (HeaderParameters, error) {
 	return HeaderParameters{
-		ParentHash:      [32]frontend.Variable(slices.Clone(header.ParentHash[:])),
-		UncleHash:       [32]frontend.Variable(slices.Clone(header.UncleHash[:])),
-		Coinbase:        [20]frontend.Variable(slices.Clone(header.Coinbase[:])),
-		Root:            [32]frontend.Variable(slices.Clone(header.Root[:])),
-		TxHash:          [32]frontend.Variable(slices.Clone(header.TxHash[:])),
-		ReceiptHash:     [32]frontend.Variable(slices.Clone(header.ReceiptHash[:])),
-		Bloom:           [256]frontend.Variable(slices.Clone(header.Bloom[:])),
-		Difficulty:      [8]frontend.Variable(slices.Clone(header.Difficulty[:])),
-		Number:          [8]frontend.Variable(slices.Clone(header.Number[:])),
-		GasLimit:        [8]frontend.Variable(slices.Clone(header.GasLimit[:])),
-		GasUsed:         [8]frontend.Variable(slices.Clone(header.GasUsed[:])),
-		Time:            [8]frontend.Variable(slices.Clone(header.Time[:])),
-		MixDigest:       [32]frontend.Variable(slices.Clone(header.MixDigest[:])),
-		Nonce:           [8]frontend.Variable(slices.Clone(header.Nonce[:])),
-		BaseFee:         [8]frontend.Variable(slices.Clone(header.BaseFee[:])),
-		WithdrawalsHash: [32]frontend.Variable(slices.Clone(header.WithdrawalsHash[:])),
-		Extra:           slices.Clone(header.Extra[:header.hashableExtraLen]),
+		ParentHash:       [32]frontend.Variable(slices.Clone(header.ParentHash[:])),
+		UncleHash:        [32]frontend.Variable(slices.Clone(header.UncleHash[:])),
+		Coinbase:         [20]frontend.Variable(slices.Clone(header.Coinbase[:])),
+		Root:             [32]frontend.Variable(slices.Clone(header.Root[:])),
+		TxHash:           [32]frontend.Variable(slices.Clone(header.TxHash[:])),
+		ReceiptHash:      [32]frontend.Variable(slices.Clone(header.ReceiptHash[:])),
+		Bloom:            [256]frontend.Variable(slices.Clone(header.Bloom[:])),
+		Difficulty:       [8]frontend.Variable(slices.Clone(header.Difficulty[:])),
+		Number:           [8]frontend.Variable(slices.Clone(header.Number[:])),
+		GasLimit:         [8]frontend.Variable(slices.Clone(header.GasLimit[:])),
+		GasUsed:          [8]frontend.Variable(slices.Clone(header.GasUsed[:])),
+		Time:             [8]frontend.Variable(slices.Clone(header.Time[:])),
+		MixDigest:        [32]frontend.Variable(slices.Clone(header.MixDigest[:])),
+		Nonce:            [8]frontend.Variable(slices.Clone(header.Nonce[:])),
+		BaseFee:          [8]frontend.Variable(slices.Clone(header.BaseFee[:])),
+		WithdrawalsHash:  [32]frontend.Variable(slices.Clone(header.WithdrawalsHash[:])),
+		Extra:            slices.Clone(header.Extra[:header.hashableExtraLen]),
+		hashableExtraLen: header.hashableExtraLen,
 	}, nil
 }
 
@@ -308,51 +308,52 @@ func (header *HeaderParameters) Serialize() []frontend.Variable {
 	input = append(input, header.GasLimit[:]...)
 	input = append(input, header.GasUsed[:]...)
 	input = append(input, header.Time[:]...)
+	input = append(input, header.Extra...)
 	input = append(input, header.MixDigest[:]...)
 	input = append(input, header.Nonce[:]...)
 	input = append(input, header.BaseFee[:]...)
 	input = append(input, header.WithdrawalsHash[:]...)
-	input = append(input, header.Extra...)
 	return input
 }
 
-func (header *HeaderParameters) Deserialize(input []frontend.Variable) {
-	index := 0
-	copy(header.ParentHash[:], input[index:index+len(header.ParentHash)])
-	index += len(header.ParentHash)
-	copy(header.UncleHash[:], input[index:index+len(header.UncleHash)])
-	index += len(header.UncleHash)
-	copy(header.Coinbase[:], input[index:index+len(header.Coinbase)])
-	index += len(header.Coinbase)
-	copy(header.Root[:], input[index:index+len(header.Root)])
-	index += len(header.Root)
-	copy(header.TxHash[:], input[index:index+len(header.TxHash)])
-	index += len(header.TxHash)
-	copy(header.ReceiptHash[:], input[index:index+len(header.ReceiptHash)])
-	index += len(header.ReceiptHash)
-	copy(header.Bloom[:], input[index:index+len(header.Bloom)])
-	index += len(header.Bloom)
-	copy(header.Difficulty[:], input[index:index+len(header.Difficulty)])
-	index += len(header.Difficulty)
-	copy(header.Number[:], input[index:index+len(header.Number)])
-	index += len(header.Number)
-	copy(header.GasLimit[:], input[index:index+len(header.GasLimit)])
-	index += len(header.GasLimit)
-	copy(header.GasUsed[:], input[index:index+len(header.GasUsed)])
-	index += len(header.GasUsed)
-	copy(header.Time[:], input[index:index+len(header.Time)])
-	index += len(header.Time)
-	copy(header.MixDigest[:], input[index:index+len(header.MixDigest)])
-	index += len(header.MixDigest)
-	copy(header.Nonce[:], input[index:index+len(header.Nonce)])
-	index += len(header.Nonce)
-	copy(header.BaseFee[:], input[index:index+len(header.BaseFee)])
-	index += len(header.BaseFee)
-	copy(header.WithdrawalsHash[:], input[index:index+len(header.WithdrawalsHash)])
-	index += len(header.WithdrawalsHash)
-	header.Extra = make([]frontend.Variable, len(input[index:]))
-	copy(header.Extra[:], input[index:])
-}
+//func (header *HeaderParameters) Deserialize(input []frontend.Variable) {
+//	index := 0
+//	copy(header.ParentHash[:], input[index:index+len(header.ParentHash)])
+//	index += len(header.ParentHash)
+//	copy(header.UncleHash[:], input[index:index+len(header.UncleHash)])
+//	index += len(header.UncleHash)
+//	copy(header.Coinbase[:], input[index:index+len(header.Coinbase)])
+//	index += len(header.Coinbase)
+//	copy(header.Root[:], input[index:index+len(header.Root)])
+//	index += len(header.Root)
+//	copy(header.TxHash[:], input[index:index+len(header.TxHash)])
+//	index += len(header.TxHash)
+//	copy(header.ReceiptHash[:], input[index:index+len(header.ReceiptHash)])
+//	index += len(header.ReceiptHash)
+//	copy(header.Bloom[:], input[index:index+len(header.Bloom)])
+//	index += len(header.Bloom)
+//	copy(header.Difficulty[:], input[index:index+len(header.Difficulty)])
+//	index += len(header.Difficulty)
+//	copy(header.Number[:], input[index:index+len(header.Number)])
+//	index += len(header.Number)
+//	copy(header.GasLimit[:], input[index:index+len(header.GasLimit)])
+//	index += len(header.GasLimit)
+//	copy(header.GasUsed[:], input[index:index+len(header.GasUsed)])
+//	index += len(header.GasUsed)
+//	copy(header.Time[:], input[index:index+len(header.Time)])
+//	index += len(header.Time)
+//	copy(header.Extra[:], input[index:index+len(header.Extra)])
+//	copy(header.MixDigest[:], input[index:index+len(header.MixDigest)])
+//	index += len(header.MixDigest)
+//	copy(header.Nonce[:], input[index:index+len(header.Nonce)])
+//	index += len(header.Nonce)
+//	copy(header.BaseFee[:], input[index:index+len(header.BaseFee)])
+//	index += len(header.BaseFee)
+//	copy(header.WithdrawalsHash[:], input[index:index+len(header.WithdrawalsHash)])
+//	index += len(header.WithdrawalsHash)
+//	header.Extra = make([]frontend.Variable, len(input[index:]))
+//	copy(header.Extra[:], input[index:])
+//}
 
 func GetCompressedHeaderParameters(header *types.Header) (CompressHeaderParameters, error) {
 	hashableExtraLen := len(header.Extra)
@@ -491,13 +492,4 @@ func GetHeaderParamter(header *types.Header) (HeaderParameters, error) {
 		WithdrawalsHash:  [32]frontend.Variable(bytesToVariables(header.WithdrawalsHash[:])),
 		hashableExtraLen: hashableExtraLen,
 	}, nil
-}
-
-// CutHeaderParameters todo delete or as a func?
-type CutHeaderParameters struct {
-	ParentHash []frontend.Variable
-	Number     []frontend.Variable
-	Time       []frontend.Variable
-	Extra      []frontend.Variable
-	MixDigest  []frontend.Variable
 }

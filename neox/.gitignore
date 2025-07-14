@@ -7,6 +7,7 @@
 */*.vk
 */*.sol
 */*.ccs
+*/*.proof
 cmd/Phase1*
 cmd/Phase2*
 cmd/srs*

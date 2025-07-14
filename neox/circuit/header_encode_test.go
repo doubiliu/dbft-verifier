@@ -124,13 +124,11 @@ func TestHeaderEncoderV2(t *testing.T) {
 	assert.NoError(err)
 }
 
-func TestRLPEncodeVerifyOptimizeCircuit(t *testing.T) {
+func TestRLPEncodeVerifyCircuit(t *testing.T) {
 	assert := test.NewAssert(t)
 	extraVersion := ExtraV0
 	header, _ := HeaderTestData(extraVersion)
 	pheader, err := GetCompressedHeaderParameters(header)
-	assert.NoError(err)
-	origin, err := GetHeaderParamter(header)
 	assert.NoError(err)
 	data, err := encodeHeader(header, false)
 	if err != nil {
@@ -140,17 +138,17 @@ func TestRLPEncodeVerifyOptimizeCircuit(t *testing.T) {
 	r1 := new(big.Int).SetBytes(data[:16])
 	r2 := new(big.Int).SetBytes(data[16:])
 
-	circuit := HeaderRLPEncodeVerifyOptimizeWrapper{
+	circuit := HeaderRLPEncodeVerifyWrapper{
 		Header:       pheader,
-		Origin:       origin,
-		RlpHash:      [2]frontend.Variable{},
+		RlpHash:      [2]frontend.Variable{0, 0},
 		extraVersion: extraVersion,
+		isNoSig:      false,
 	}
-	assignment := HeaderRLPEncodeVerifyOptimizeWrapper{
+	assignment := HeaderRLPEncodeVerifyWrapper{
 		Header:       pheader,
-		Origin:       origin,
 		RlpHash:      [2]frontend.Variable{r1, r2},
 		extraVersion: extraVersion,
+		isNoSig:      false,
 	}
 	witness, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
 	//ccs, err := helper.ReadCCS("rlp_encode_hash_extra_v0.ccs")
@@ -211,127 +209,30 @@ func TestRLPEncodeVerifyOptimizeCircuit(t *testing.T) {
 	assert.NoError(err)
 }
 
-func TestRLPEncodeVerifyCircuit(t *testing.T) {
-	assert := test.NewAssert(t)
-	extraVersion := ExtraV1
-	header, _ := HeaderTestData(extraVersion)
-	pheader, err := GetHeaderParamter(header)
-	assert.NoError(err)
-	data, err := encodeHeader(header, false)
-	if err != nil {
-		panic(err)
-	}
-	data = common.BytesToHash(crypto.Keccak256(data)).Bytes()
-	RLPHash := make([]frontend.Variable, len(data))
-	for i := 0; i < len(RLPHash); i++ {
-		RLPHash[i] = data[i]
-	}
-	serializeHeader := pheader.Serialize()
-	input := make([]frontend.Variable, 0)
-	input = append(input, RLPHash...)
-	input = append(input, serializeHeader...)
-	circuit := HeaderRLPEncodeVerifyWrapper{
-		Input:        input,
-		ExtraVersion: extraVersion,
-	}
-	assignment := HeaderRLPEncodeVerifyWrapper{
-		Input:        input,
-		ExtraVersion: extraVersion,
-	}
-	witness, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
-	//ccs, err := helper.ReadCCS("rlp_encode_hash_extra_v0.ccs")
-	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
-	if err != nil {
-		panic(err)
-	}
-	pk, vk, err := groth16.Setup(ccs)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(ccs.GetNbConstraints())
-	//pk, err := helper.ReadProvingKey("rlp_encode_hash_extra_v0.pk")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//vk, err := helper.ReadVerifyingKey("rlp_encode_hash_extra_v0.vk")
-	//if err != nil {
-	//	panic(err)
-	//}
-	proof, err := groth16.Prove(ccs, pk, witness, backend.WithProverHashToFieldFunction(sha256.New()))
-	if err != nil {
-		panic(err)
-	}
-	publicWitness, err := witness.Public()
-	if err != nil {
-		panic(err)
-	}
-	err = groth16.Verify(proof, vk, publicWitness, backend.WithVerifierHashToFieldFunction(sha256.New()))
-	var version string
-	switch extraVersion {
-	case ExtraV0:
-		version = "extra_v0"
-	case ExtraV1:
-		version = "extra_v1"
-	case ExtraV2:
-		version = "extra_v2"
-	default:
-		panic("invalid extraVersion")
-	}
-	helper.ExportCCS(ccs, fmt.Sprintf("rlp_encode_hash_%s.ccs", version))
-	helper.ExportProvingKey(pk.(*groth16_bn254.ProvingKey), fmt.Sprintf("rlp_encode_hash_%s.pk", version))
-	helper.ExportVerifyingKey(vk.(*groth16_bn254.VerifyingKey), fmt.Sprintf("rlp_encode_hash_%s.vk", version))
-	proofData, cmts, cmtPok := helper.GetGroth16ContractInput(proof.(*groth16_bn254.Proof))
-	// proof.Ar, proof.Bs, proof.Krs
-	fmt.Printf("Proof:")
-	for i := 0; i < 8; i++ {
-		fmt.Printf(proofData[i].String())
-	}
-	fmt.Println()
-	// commitments
-	fmt.Printf("Commitments:")
-	for i := 0; i < len(cmts); i++ {
-		fmt.Printf(cmts[i].String())
-	}
-	fmt.Println()
-	// commitmentPok
-	fmt.Printf("CommitmentPok:")
-	for i := 0; i < len(cmtPok); i++ {
-		fmt.Printf(cmtPok[i].String())
-	}
-	//err = test.IsSolved(&circuit, &assignment, ecc.BN254.ScalarField())
-	//if err != nil {
-	//	panic(err)
-	//}
-	assert.NoError(err)
-}
-
 func TestNoSigHeaderRLPEncodeCircuit(t *testing.T) {
 	assert := test.NewAssert(t)
 	header, _ := HeaderTestData(ExtraV0) // must be ExtraV0, in ExtraV1 we use hash to g2
-	pheader, err := GetHeaderParamter(header)
+	pheader, err := GetCompressedHeaderParameters(header)
 	assert.NoError(err)
 	data, err := encodeHeader(header, true) // no sig
 	if err != nil {
 		panic(err)
 	}
 	data = common.BytesToHash(crypto.Keccak256(data)).Bytes()
-	RLPHash := make([]frontend.Variable, len(data))
-	for i := 0; i < len(RLPHash); i++ {
-		RLPHash[i] = data[i]
-	}
-	noSigPHeader, err := pheader.NoSigHeader() // we just change the input, so that we can reuse the circuit
-	assert.NoError(err)
-	serializeHeader := noSigPHeader.Serialize()
-	input := make([]frontend.Variable, 0)
-	input = append(input, RLPHash...)
-	input = append(input, serializeHeader...)
+	r1 := new(big.Int).SetBytes(data[:16])
+	r2 := new(big.Int).SetBytes(data[16:])
+
 	circuit := HeaderRLPEncodeVerifyWrapper{
-		Input:        input,
-		ExtraVersion: ExtraV0,
+		RlpHash:      [2]frontend.Variable{0, 0},
+		Header:       pheader,
+		extraVersion: ExtraV0,
+		isNoSig:      true,
 	}
 	assignment := HeaderRLPEncodeVerifyWrapper{
-		Input:        input,
-		ExtraVersion: ExtraV0,
+		RlpHash:      [2]frontend.Variable{r1, r2},
+		Header:       pheader,
+		extraVersion: ExtraV0,
+		isNoSig:      true,
 	}
 	witness, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
 	//ccs, err := helper.ReadCCS("rlp_encode_hash_extra_v0.ccs")
@@ -385,30 +286,29 @@ func TestNoSigHeaderRLPEncodeCircuit(t *testing.T) {
 func TestHeaderHashToG2VerifyCircuit(t *testing.T) {
 	assert := test.NewAssert(t)
 	_, header := HeaderTestData(ExtraV1)
-	cheader, err := GetHeaderParamter(header)
+	cheader, err := GetCompressedHeaderParameters(header)
 	assert.NoError(err)
 	data, err := encodeHeader(header, true)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("%v\n", data)
+	//fmt.Printf("%v\n", data)
 	hash, err := bls12381.HashToG2(data, BLSDomain)
 	if err != nil {
 		panic(err)
 	}
-	ToG2Hash := make([]frontend.Variable, len(hash.Bytes()))
-	for i := 0; i < len(ToG2Hash); i++ {
-		ToG2Hash[i] = hash.Bytes()[i]
+	g2HashBytes := hash.Bytes()
+	toG2HashCompressed := [4]frontend.Variable{}
+	for i := 0; i < 4; i++ {
+		toG2HashCompressed[i] = new(big.Int).SetBytes(g2HashBytes[i*24 : (i+1)*24])
 	}
-	serializeHeader := cheader.Serialize()
-	input := make([]frontend.Variable, 0)
-	input = append(input, ToG2Hash...)
-	input = append(input, serializeHeader...)
 	circuit := HeaderHashToG2VerifyWrapper{
-		Input: input,
+		Header:   cheader,
+		ToG2Hash: [4]frontend.Variable{0, 0, 0, 0},
 	}
 	assignment := HeaderHashToG2VerifyWrapper{
-		Input: input,
+		Header:   cheader,
+		ToG2Hash: toG2HashCompressed,
 	}
 	witness, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
 	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
@@ -432,10 +332,10 @@ func TestHeaderHashToG2VerifyCircuit(t *testing.T) {
 	helper.ExportProvingKey(pk.(*groth16_bn254.ProvingKey), "to_g2_hash.pk")
 	helper.ExportVerifyingKey(vk.(*groth16_bn254.VerifyingKey), "to_g2_hash.vk")
 	helper.GetGroth16ContractInput(proof.(*groth16_bn254.Proof))
-	err = test.IsSolved(&circuit, &assignment, ecc.BN254.ScalarField())
-	if err != nil {
-		panic(err)
-	}
+	//err = test.IsSolved(&circuit, &assignment, ecc.BN254.ScalarField())
+	//if err != nil {
+	//	panic(err)
+	//}
 	assert.NoError(err)
 }
 
@@ -461,19 +361,29 @@ func (c *HeaderEncoderWrapper) Define(api frontend.API) error {
 
 // HeaderRLPEncodeVerifyWrapper is used in V0/V1/V2, generate a proof of rlpHash(header)
 // we use header.NoSigHeader() to get a NoSigHeaderRLPEncodeVerifyWrapper which is used in V0, generates a proof of rlpHash(NoSigHeader)
-// We prove that rlpHash(header) = r, and bits(r)[:128] = r1, bits[128:] = r2
-// header.BlockNumber and header.Time is revealed
-type HeaderRLPEncodeVerifyOptimizeWrapper struct {
+// To reduce the number of public input, we use CompressHeadParameters instead of HeadParameters
+type HeaderRLPEncodeVerifyWrapper struct {
 	RlpHash      [2]frontend.Variable     `gnark:",public"` // we use 2 frontend.Variable to present a 256-variables rlp-hash
 	Header       CompressHeaderParameters `gnark:",public"` // we do not reveal the whole header
-	Origin       HeaderParameters
 	extraVersion byte
+	isNoSig      bool
 }
 
-func (c *HeaderRLPEncodeVerifyOptimizeWrapper) Define(api frontend.API) error {
+func (c *HeaderRLPEncodeVerifyWrapper) Define(api frontend.API) error {
 	encode := NewHeaderEncoder(api)
 	header := c.Header.Decompressed(api)
-	rlpHash, err := encode.Encode(header, c.extraVersion)
+	var toEncodeHeader HeaderParameters
+	var err error
+	if c.isNoSig {
+		toEncodeHeader, err = header.NoSigHeader()
+		if err != nil {
+			return err
+		}
+	} else {
+		toEncodeHeader = header
+
+	}
+	rlpHash, err := encode.Encode(toEncodeHeader, c.extraVersion)
 	api.Println(rlpHash)
 	if err != nil {
 		return err
@@ -503,45 +413,38 @@ func (c *HeaderRLPEncodeVerifyOptimizeWrapper) Define(api frontend.API) error {
 	return nil
 }
 
-type HeaderRLPEncodeVerifyWrapper struct {
-	Input        []frontend.Variable `gnark:",public"`
-	ExtraVersion byte
-}
-
-// Define declares the circuit's constraints
-func (c *HeaderRLPEncodeVerifyWrapper) Define(api frontend.API) error {
-	RLPHash := c.Input[:32]
-	Input := c.Input[32:]
-	var header HeaderParameters
-	header.Deserialize(Input)
-	encode := NewHeaderEncoder(api)
-	rlpHash, err := encode.Encode(header, c.ExtraVersion)
-	if err != nil {
-		return err
-	}
-	for i := 0; i < len(rlpHash); i++ {
-		api.AssertIsEqual(rlpHash[i], RLPHash[i])
-	}
-	return nil
-}
-
 // HeaderHashToG2VerifyWrapper is used in V1/V2, generate a proof of HashToG2(NoSigHeader)
+// This is only used for computing V1/V2 No-sig header's G2Hash
+// To reduce the number of public input, we use CompressHeadParameters instead of HeadParameters
+// We use 4 frontend.Variable to present a 96-byte(768-bit) G2Hash, each variable have 192-bit
 type HeaderHashToG2VerifyWrapper struct {
-	Input []frontend.Variable `gnark:",public"`
+	ToG2Hash [4]frontend.Variable     `gnark:",public"`
+	Header   CompressHeaderParameters `gnark:",public"`
 }
 
 // Define declares the circuit's constraints
 func (c *HeaderHashToG2VerifyWrapper) Define(api frontend.API) error {
-	ToG2Hash := c.Input[:96]
-	Input := c.Input[96:]
-	var header HeaderParameters
-	header.Deserialize(Input)
+	header := c.Header.Decompressed(api)
 	encode := NewHeaderEncoder(api)
-	toG2Hash := encode.HashToG2(api, header)
+	noSigHeader, err := header.NoSigHeader()
+	if err != nil {
+		return err
+	}
+	toG2Hash := encode.HashToG2(api, noSigHeader)
 	/*	api.Println(toG2Hash)
 		api.Println(ToG2Hash)*/
-	for i := 0; i < len(toG2Hash); i++ {
-		api.AssertIsEqual(toG2Hash[i], ToG2Hash[i])
+	// toG2Hash is 96-byte
+	slices.Reverse(toG2Hash)
+	toG2HashBits := make([]frontend.Variable, 0)
+	for _, g := range toG2Hash {
+		toG2HashBits = append(toG2HashBits, api.ToBinary(g, 8)...)
+	}
+	r := make([]frontend.Variable, 4)
+	for i := 0; i < 4; i++ {
+		r[3-i] = api.FromBinary(toG2HashBits[192*i : (i+1)*192]...)
+	}
+	for i := 0; i < len(c.ToG2Hash); i++ {
+		api.AssertIsEqual(c.ToG2Hash[i], r[i])
 	}
 	return nil
 }
@@ -569,7 +472,7 @@ func HeaderTestData(extraVersion byte) (parent, current *types.Header) {
 			"size": "0x3f9",
 			"stateRoot": "0xdb2f7ede2ec991c786df6ac4672817f1608b4893484238d06da8a2278924e8e9",
 			"timestamp": "0x668fb56c",
-			"totalDifficulty": "0x1d",
+			"totalDifficulty": "0x1d",	
 			"transactions": [],
 			"transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
 			"uncles": [],

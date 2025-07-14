@@ -203,7 +203,7 @@ func (h *HeaderEncoder) HashToG2(api frontend.API, header HeaderParameters) []fr
 	v := header.Extra[0]
 	//Extra[0] should be ExtraV1 | ExtraV2
 	rangeCheck(api, v, []frontend.Variable{frontend.Variable(ExtraV1), frontend.Variable(ExtraV2)})
-
+	api.AssertIsEqual(hashableExtraLen, len(header.Extra))
 	rlp := NewRlpEncode(api)
 	encodeHeader1 := make([][]frontend.Variable, 8)
 	encodeHeader1[0] = rlp.EncodeRule2(header.ParentHash[:])

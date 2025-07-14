@@ -1,6 +1,7 @@
 package circuit
 
 import (
+	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/test"
@@ -14,7 +15,13 @@ type CompressHeaderWrapper struct {
 }
 
 func (c *CompressHeaderWrapper) Define(api frontend.API) error {
-	compress := c.Header.Compress(api)
+	noSigHeader, err := c.Header.NoSigHeader()
+	if err != nil {
+		return err
+	}
+	compress := noSigHeader.Compress(api)
+	fmt.Println(111, len(compress.Serialize()))
+	fmt.Println(222, len(c.CompressHeader.Serialize()))
 	r := compress.Decompressed(api)
 	assertIsSame := func(a []frontend.Variable, b []frontend.Variable) {
 		api.AssertIsEqual(len(a), len(b))
@@ -37,25 +44,33 @@ func (c *CompressHeaderWrapper) Define(api frontend.API) error {
 		assertIsSame(h.Number[:], recov.Number[:])
 		assertIsSame(h.Time[:], recov.Time[:])
 		assertIsSame(h.Extra[:], recov.Extra[:])
+
 		assertIsSame(h.MixDigest[:], recov.MixDigest[:])
 		assertIsSame(h.BaseFee[:], recov.BaseFee[:])
 		assertIsSame(h.WithdrawalsHash[:], recov.WithdrawalsHash[:])
 		api.AssertIsEqual(c.Header.hashableExtraLen, recov.hashableExtraLen)
 	}
-	check(c.Header, r)
+	check(noSigHeader, r)
 	fromCompressR := c.CompressHeader.Decompressed(api)
-	check(c.Header, fromCompressR)
+	fromCompressNoSig, err := fromCompressR.NoSigHeader()
+	if err != nil {
+		return err
+	}
+	check(noSigHeader, fromCompressNoSig)
 	return nil
 }
 
 func TestCompressCircuit(t *testing.T) {
-	parent, _ := HeaderTestData(ExtraV0)
+	parent, _ := HeaderTestData(ExtraV1)
 	header, err := GetHeaderParamter(parent)
+	assert.NoError(t, err)
+	noSig, err := header.NoSigHeader()
 	assert.NoError(t, err)
 	compressHeader, err := GetCompressedHeaderParameters(parent)
 	assert.NoError(t, err)
-	circuit := CompressHeaderWrapper{Header: header, CompressHeader: compressHeader}
-	assignment := CompressHeaderWrapper{Header: header, CompressHeader: compressHeader}
+	fmt.Println(333, len(compressHeader.Extra.Variables), compressHeader.Extra.Length)
+	circuit := CompressHeaderWrapper{Header: noSig, CompressHeader: compressHeader}
+	assignment := CompressHeaderWrapper{Header: noSig, CompressHeader: compressHeader}
 	err = test.IsSolved(&circuit, &assignment, ecc.BN254.ScalarField())
 	assert.NoError(t, err)
 }
