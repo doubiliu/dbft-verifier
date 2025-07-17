@@ -244,28 +244,28 @@ type RlpEncodeWrapper struct {
 // Define declares the circuit's constraints
 func (c *RlpEncodeWrapper) Define(api frontend.API) error {
 	rlpencode := NewRlpEncode(api)
-	result1 := rlpencode.EncodeRule1(api, c.Rule1Data)
-	result2 := rlpencode.EncodeRule2(api, c.Rule2Data)
-	result3_1 := rlpencode.EncodeRule3_OneByte(api, c.Rule3_1Data)
-	result3_2 := rlpencode.EncodeRule3_TwoBytes(api, c.Rule3_2Data)
+	result1 := rlpencode.EncodeRule1(c.Rule1Data)
+	result2 := rlpencode.EncodeRule2(c.Rule2Data)
+	result3_1 := rlpencode.EncodeRule3_OneByte(c.Rule3_1Data)
+	result3_2 := rlpencode.EncodeRule3_TwoBytes(c.Rule3_2Data)
 
 	r4 := make([][]frontend.Variable, len(c.Rule4Data))
 	for i := 0; i < len(c.Rule4Data); i++ {
-		r4[i] = rlpencode.EncodeRule2(api, c.Rule4Data[i])
+		r4[i] = rlpencode.EncodeRule2(c.Rule4Data[i])
 	}
-	result4 := rlpencode.EncodeRule4(api, r4)
+	result4 := rlpencode.EncodeRule4(r4)
 
 	r5_1 := make([][]frontend.Variable, len(c.Rule5_1Data))
 	for i := 0; i < len(c.Rule5_1Data); i++ {
-		r5_1[i] = rlpencode.EncodeRule3_OneByte(api, c.Rule5_1Data[i])
+		r5_1[i] = rlpencode.EncodeRule3_OneByte(c.Rule5_1Data[i])
 	}
-	result5_1 := rlpencode.EncodeRule5_OneByte(api, r5_1)
+	result5_1 := rlpencode.EncodeRule5_OneByte(r5_1)
 
 	r5_2 := make([][]frontend.Variable, len(c.Rule5_2Data))
 	for i := 0; i < len(c.Rule5_2Data); i++ {
-		r5_2[i] = rlpencode.EncodeRule3_TwoBytes(api, c.Rule5_2Data[i])
+		r5_2[i] = rlpencode.EncodeRule3_TwoBytes(c.Rule5_2Data[i])
 	}
-	result5_2 := rlpencode.EncodeRule5_TwoBytes(api, r5_2)
+	result5_2 := rlpencode.EncodeRule5_TwoBytes(r5_2)
 
 	api.Println(result1)
 	api.Println(c.Inpput1Data)
