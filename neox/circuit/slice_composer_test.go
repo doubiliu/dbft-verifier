@@ -16,9 +16,6 @@ import (
 	"testing"
 )
 
-// 这里我假设有两个（可以扩展到n个）的slice，要做某个操作（比如去掉前导0）
-// 每个generator需要开发者编写一个函数返回一个结构体,UndeterminedSlice,其中Variable是一个slice(长度任意), isSelect是是否选择这个
-// 每个generator会返回若干个slice，其中只有一个被选
 func TestUndeterminedProgram(t *testing.T) {
 	blockHeight := uint64(10000213)
 	difficulty := uint64(234241)
@@ -147,7 +144,7 @@ func (c *Keccak256UndeterminedChecker) Define(api frontend.API) error {
 	if err != nil {
 		return err
 	}
-	// c.Concat是拼后的结果
+
 	concatGenerator := func(api frontend.API) []UndeterminedSlice {
 		slices := make([]UndeterminedSlice, 0)
 		api.Println(c.Concat.Padding)
@@ -161,53 +158,7 @@ func (c *Keccak256UndeterminedChecker) Define(api frontend.API) error {
 		}
 		return slices
 	}
-	//// 这里的两个generator本质上是一样的，其实可以写成一个func(api frontend.API, slice []frontend.Variable) -> func(api frontend.API) []UndeterminedSlice
-	//// 函数里写return 下面把数组统一写的形式
-	//// 这里考虑到只是这个例子是一样的逻辑，所以分开了
-	//hBytesGenerator := func(api frontend.API) []UndeterminedSlice {
-	//	fmt.Println("hBytes Selectors: ")
-	//	slices := make([]UndeterminedSlice, 0)
-	//	suffixSum := frontend.Variable(0)
-	//	zeroNumber := frontend.Variable(0)
-	//	for i := len(hBytes) - 1; i >= 0; i-- {
-	//		suffixSum = api.Add(suffixSum, hBytes[i])
-	//		isZero := api.IsZero(hBytes[i])
-	//		slices = append(slices, UndeterminedSlice{
-	//			Variables: hBytes[:i+1],
-	//			// zeroNumber == len(hbytes) - 1 - i && !isZero
-	//			// isZero == 1 -> isSelect = 0
-	//			// isZero == 0, len(hbytes) - 1 - i - zeroNumber == 0 -> isSelect = 1
-	//			IsSelected: api.Mul(api.Sub(1, isZero), api.IsZero(api.Sub(len(hBytes)-1-i, zeroNumber))), // suffix = 1, and current = 1
-	//		})
-	//		api.Println(slices[len(slices)-1].Variables)
-	//		api.Println(slices[len(slices)-1].IsSelected)
-	//		zeroNumber = api.Add(zeroNumber, isZero)
-	//	}
-	//	return slices
-	//}
-	//
-	//dBytesGenerator := func(api frontend.API) []UndeterminedSlice {
-	//	fmt.Println("dBytes Selectors: ")
-	//	slices := make([]UndeterminedSlice, 0)
-	//	suffixSum := frontend.Variable(0)
-	//	zeroNumber := frontend.Variable(0)
-	//	for i := len(dBytes) - 1; i >= 0; i-- {
-	//		suffixSum = api.Add(suffixSum, dBytes[i])
-	//		isZero := api.IsZero(dBytes[i])
-	//		slices = append(slices, UndeterminedSlice{
-	//			Variables: dBytes[:i+1],
-	//			// zeroNumber == len(dbytes) - 1 - i && !isZero
-	//			// isZero == 1 -> isSelect = 0
-	//			// isZero == 0, len(dbytes) - 1 - zeroNumber == 0 -> isSelect = 1
-	//			IsSelected: api.Mul(api.Sub(1, isZero), api.IsZero(api.Sub(len(dBytes)-1-i, zeroNumber))), // suffix = 1, and current = 1
-	//		})
-	//		api.Println(slices[len(slices)-1].Variables)
-	//		api.Println(slices[len(slices)-1].IsSelected)
-	//		zeroNumber = api.Add(zeroNumber, isZero)
-	//	}
-	//	return slices
-	//
-	//}
+
 	sliceComposer := NewSliceComposer(api)
 	fn := func(api frontend.API, slices ...UndeterminedSlice) (DeterminedSlice, error) {
 		preImage := make([]frontend.Variable, 0)

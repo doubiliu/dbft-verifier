@@ -2,9 +2,11 @@ package helper
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"github.com/txhsl/neox-dbft-verifier/mpc"
 	"math/big"
 	"os"
+	"path/filepath"
 
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend"
@@ -94,15 +96,16 @@ func ReadProvingKey(path string) (*groth16.ProvingKey, error) {
  * @Description: export proving key file
  * @param pk: proving key
  */
-func ExportProvingKey(pk *groth16.ProvingKey, path string) {
+func ExportProvingKey(pk *groth16.ProvingKey, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	_, err = pk.WriteTo(file)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 /**
@@ -128,15 +131,16 @@ func ReadVerifyingKey(path string) (*groth16.VerifyingKey, error) {
  * @Description: export verifying key file
  * @param vk: verifying key
  */
-func ExportVerifyingKey(vk *groth16.VerifyingKey, path string) {
+func ExportVerifyingKey(vk *groth16.VerifyingKey, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	_, err = vk.WriteTo(file)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 /**
@@ -162,15 +166,21 @@ func ReadCCS(path string) (constraint.ConstraintSystem, error) {
  * @Description: export r1cs file
  * @param css: r1cs
  */
-func ExportCCS(ccs constraint.ConstraintSystem, path string) {
+func ExportCCS(ccs constraint.ConstraintSystem, path string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
 	file, err := os.Create(path)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to create file %s: %w", path, err)
 	}
+	defer file.Close()
 	_, err = ccs.WriteTo(file)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to write CCS to file %s: %w", path, err)
 	}
+	return nil
 }
 
 /**

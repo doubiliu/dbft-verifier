@@ -4,15 +4,25 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/consensys/gnark-crypto/ecc"
+	bls12381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
 	"github.com/consensys/gnark-crypto/ecc/secp256k1"
 	"github.com/consensys/gnark-crypto/ecc/secp256k1/fp"
+	"github.com/consensys/gnark/backend/groth16"
+	"github.com/consensys/gnark/backend/witness"
+	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/math/emulated"
 	"github.com/consensys/gnark/std/math/uints"
+	stdgroth16 "github.com/consensys/gnark/std/recursion/groth16"
 	"github.com/consensys/gnark/std/signature/ecdsa"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	"math/big"
 )
 
 func encodeHeader(header *types.Header, noSig bool) ([]byte, error) {
@@ -111,4 +121,85 @@ func publicKeyToVariable(publicKey btcec.PublicKey) ecdsa.PublicKey[emulated.Sec
 		X: emulated.ValueOf[emulated.Secp256k1Fp](pub.X),
 		Y: emulated.ValueOf[emulated.Secp256k1Fp](pub.Y),
 	}
+}
+
+func ComputeRLPProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk *groth16.ProvingKey, vk *groth16.VerifyingKey, header *types.Header, IsNoSig bool) (groth16.Proof, witness.Witness, error) {
+
+	pheader, err := GetCompressedHeaderParameters(header)
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := encodeHeader(header, IsNoSig) // no sig
+	if err != nil {
+		return nil, nil, err
+	}
+	data = common.BytesToHash(crypto.Keccak256(data)).Bytes()
+	r1 := new(big.Int).SetBytes(data[:16])
+	r2 := new(big.Int).SetBytes(data[16:])
+	fmt.Println("rlpInput-out-circuit:")
+	fmt.Println(data)
+	assignment := HeaderRLPEncodeVerifyWrapper{
+		Header:  pheader,
+		RlpHash: [2]frontend.Variable{r1, r2},
+	}
+	w, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
+	if err != nil {
+		return nil, nil, err
+	}
+	pubWitness, err := w.Public()
+	if err != nil {
+		return nil, nil, err
+	}
+	innerProof, err := groth16.Prove(ccs, *pk, w, stdgroth16.GetNativeProverOptions(outer, field))
+	if err != nil {
+		return nil, nil, err
+	}
+	err = groth16.Verify(innerProof, *vk, pubWitness, stdgroth16.GetNativeVerifierOptions(outer, field))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return innerProof, pubWitness, nil
+}
+
+func ComputeToG2HashProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk *groth16.ProvingKey, vk *groth16.VerifyingKey, header *types.Header) (groth16.Proof, witness.Witness, error) {
+	cheader, err := GetCompressedHeaderParameters(header)
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := encodeHeader(header, true)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%v\n", data)
+	hash, err := bls12381.HashToG2(data, BLSDomain)
+	if err != nil {
+		panic(err)
+	}
+	g2HashBytes := hash.Bytes()
+	toG2HashCompressed := [4]frontend.Variable{}
+	for i := 0; i < 4; i++ {
+		toG2HashCompressed[i] = new(big.Int).SetBytes(g2HashBytes[i*24 : (i+1)*24])
+	}
+	assignment := HeaderHashToG2VerifyWrapper{
+		Header:   cheader,
+		ToG2Hash: toG2HashCompressed,
+	}
+	w, err := frontend.NewWitness(&assignment, field)
+	if err != nil {
+		return nil, nil, err
+	}
+	innerPubWitness, err := w.Public()
+	if err != nil {
+		return nil, nil, err
+	}
+	innerProof, err := groth16.Prove(ccs, *pk, w, stdgroth16.GetNativeProverOptions(outer, field))
+	if err != nil {
+		return nil, nil, err
+	}
+	err = groth16.Verify(innerProof, *vk, innerPubWitness, stdgroth16.GetNativeVerifierOptions(outer, field))
+	if err != nil {
+		return nil, nil, err
+	}
+	return innerProof, innerPubWitness, nil
 }

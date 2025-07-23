@@ -9,11 +9,8 @@ import (
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
 	groth16_bn254 "github.com/consensys/gnark/backend/groth16/bn254"
-	"github.com/consensys/gnark/backend/witness"
-	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
-	"github.com/consensys/gnark/std/algebra"
 	"github.com/consensys/gnark/std/algebra/emulated/sw_bn254"
 	"github.com/consensys/gnark/std/math/emulated"
 	stdgroth16 "github.com/consensys/gnark/std/recursion/groth16"
@@ -26,8 +23,6 @@ import (
 	"github.com/txhsl/neox-dbft-verifier/helper"
 
 	"golang.org/x/crypto/sha3"
-	"math/big"
-	"os"
 	"testing"
 	"time"
 )
@@ -412,7 +407,7 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 		MixDigest[i] = current.MixDigest[i]
 	}
 
-	circuit := ExtraV1HeaderVerifyWrapper[emulated.Secp256k1Fp, emulated.Secp256k1Fr, sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
+	circuit := ExtraV1OrV2HeaderVerifyWrapper[emulated.Secp256k1Fp, emulated.Secp256k1Fr, sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
 		Parent:        pparent,
 		Current:       pcurrent,
 		RLPHashVk:     rlpKey,
@@ -422,7 +417,7 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 		ToG2HashProof: stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](toG2HashVerifyCcs),
 	}
 
-	assignment := ExtraV1HeaderVerifyWrapper[emulated.Secp256k1Fp, emulated.Secp256k1Fr, sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
+	assignment := ExtraV1OrV2HeaderVerifyWrapper[emulated.Secp256k1Fp, emulated.Secp256k1Fr, sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
 		Parent:        pparent,
 		Current:       pcurrent,
 		RLPHashProof1: rlpProof1,
@@ -459,153 +454,11 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	}
 	err = groth16.Verify(proof, vk, publicWitness, backend.WithVerifierHashToFieldFunction(sha256.New()))
 	assert.NoError(err)
-	helper.ExportCCS(ccs, "verify_header_extra_v1.ccs")
-	helper.ExportProvingKey(pk.(*groth16_bn254.ProvingKey), "verify_header_extra_v1.pk")
-	helper.ExportVerifyingKey(vk.(*groth16_bn254.VerifyingKey), "verify_header_extra_v1.vk")
+	err = helper.ExportCCS(ccs, "verify_header_extra_v1.ccs")
+	assert.NoError(err)
+	err = helper.ExportProvingKey(pk.(*groth16_bn254.ProvingKey), "verify_header_extra_v1.pk")
+	assert.NoError(err)
+	err = helper.ExportVerifyingKey(vk.(*groth16_bn254.VerifyingKey), "verify_header_extra_v1.vk")
+	assert.NoError(err)
 	helper.GetGroth16ContractInput(proof.(*groth16_bn254.Proof))
-}
-
-func ComputeRLPProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk *groth16.ProvingKey, vk *groth16.VerifyingKey, header *types.Header, IsNoSig bool) (groth16.Proof, witness.Witness, error) {
-
-	pheader, err := GetCompressedHeaderParameters(header)
-	if err != nil {
-		return nil, nil, err
-	}
-	data, err := encodeHeader(header, IsNoSig) // no sig
-	if err != nil {
-		return nil, nil, err
-	}
-	data = common.BytesToHash(crypto.Keccak256(data)).Bytes()
-	r1 := new(big.Int).SetBytes(data[:16])
-	r2 := new(big.Int).SetBytes(data[16:])
-	fmt.Println("rlpInput-out-circuit:")
-	fmt.Println(data)
-	assignment := HeaderRLPEncodeVerifyWrapper{
-		Header:  pheader,
-		RlpHash: [2]frontend.Variable{r1, r2},
-	}
-	w, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
-	if err != nil {
-		return nil, nil, err
-	}
-	pubWitness, err := w.Public()
-	if err != nil {
-		return nil, nil, err
-	}
-	innerProof, err := groth16.Prove(ccs, *pk, w, stdgroth16.GetNativeProverOptions(outer, field))
-	if err != nil {
-		return nil, nil, err
-	}
-	err = groth16.Verify(innerProof, *vk, pubWitness, stdgroth16.GetNativeVerifierOptions(outer, field))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return innerProof, pubWitness, nil
-}
-
-func ComputeToG2HashProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk *groth16.ProvingKey, vk *groth16.VerifyingKey, header *types.Header) (groth16.Proof, witness.Witness, error) {
-	cheader, err := GetCompressedHeaderParameters(header)
-	if err != nil {
-		return nil, nil, err
-	}
-	data, err := encodeHeader(header, true)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%v\n", data)
-	hash, err := bls12381.HashToG2(data, BLSDomain)
-	if err != nil {
-		panic(err)
-	}
-	g2HashBytes := hash.Bytes()
-	toG2HashCompressed := [4]frontend.Variable{}
-	for i := 0; i < 4; i++ {
-		toG2HashCompressed[i] = new(big.Int).SetBytes(g2HashBytes[i*24 : (i+1)*24])
-	}
-	assignment := HeaderHashToG2VerifyWrapper{
-		Header:   cheader,
-		ToG2Hash: toG2HashCompressed,
-	}
-	w, err := frontend.NewWitness(&assignment, field)
-	if err != nil {
-		return nil, nil, err
-	}
-	innerPubWitness, err := w.Public()
-	if err != nil {
-		return nil, nil, err
-	}
-	innerProof, err := groth16.Prove(ccs, *pk, w, stdgroth16.GetNativeProverOptions(outer, field))
-	if err != nil {
-		return nil, nil, err
-	}
-	err = groth16.Verify(innerProof, *vk, innerPubWitness, stdgroth16.GetNativeVerifierOptions(outer, field))
-	if err != nil {
-		return nil, nil, err
-	}
-	return innerProof, innerPubWitness, nil
-}
-
-type ExtraV0HeaderVerifyWrapper[ECDSAFp, ECDSAFr emulated.FieldParams, FR emulated.FieldParams, G1El algebra.G1ElementT, G2El algebra.G2ElementT, GtEl algebra.GtElementT] struct {
-	Parent         HeaderParameters
-	Current        HeaderParameters
-	RLPHashProof1  stdgroth16.Proof[G1El, G2El]              `gnark:",secret"`
-	RLPHashProof2  stdgroth16.Proof[G1El, G2El]              `gnark:",secret"`
-	RLPHashVk      stdgroth16.VerifyingKey[G1El, G2El, GtEl] `gnark:"-"`
-	NoSigHashProof stdgroth16.Proof[G1El, G2El]              `gnark:",secret"`
-	NoSigHashVk    stdgroth16.VerifyingKey[G1El, G2El, GtEl] `gnark:"-"`
-	NoSigHash      [32]frontend.Variable                     `gnark:",secret"`
-	ParentHash     [32]frontend.Variable                     `gnark:",public"`
-	CurrentHash    [32]frontend.Variable                     `gnark:",public"`
-	MixDigest      [32]frontend.Variable                     `gnark:",public"`
-	PublicKeys     []ecdsa.PublicKey[ECDSAFp, ECDSAFr]
-	AddressIndices []frontend.Variable
-}
-
-func (c *ExtraV0HeaderVerifyWrapper[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl]) Define(api frontend.API) error {
-	verifier := NewHeaderVerifier[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl](api)
-	return verifier.VerifyV0(c.Parent, c.Current, c.ParentHash[:], c.CurrentHash[:], c.MixDigest[:], c.RLPHashProof1, c.RLPHashProof2, c.RLPHashVk, c.NoSigHashProof, c.NoSigHashVk, c.NoSigHash[:], c.PublicKeys, c.AddressIndices)
-}
-
-type ExtraV1HeaderVerifyWrapper[ECDSAFp, ECDSAFr emulated.FieldParams, FR emulated.FieldParams, G1El algebra.G1ElementT, G2El algebra.G2ElementT, GtEl algebra.GtElementT] struct {
-	Parent        HeaderParameters
-	Current       HeaderParameters
-	RLPHashProof1 stdgroth16.Proof[G1El, G2El]              `gnark:",secret"`
-	RLPHashProof2 stdgroth16.Proof[G1El, G2El]              `gnark:",secret"`
-	RLPHashVk     stdgroth16.VerifyingKey[G1El, G2El, GtEl] `gnark:"-"`
-	ToG2HashProof stdgroth16.Proof[G1El, G2El]              `gnark:",secret"`
-	ToG2HashVk    stdgroth16.VerifyingKey[G1El, G2El, GtEl] `gnark:"-"`
-	ToG2Hash      [96]frontend.Variable                     `gnark:",secret"`
-	ParentHash    [32]frontend.Variable                     `gnark:",public"`
-	CurrentHash   [32]frontend.Variable                     `gnark:",public"`
-	MixDigest     [32]frontend.Variable                     `gnark:",public"`
-}
-
-func (c *ExtraV1HeaderVerifyWrapper[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl]) Define(api frontend.API) error {
-	verifer := NewHeaderVerifier[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl](api)
-	return verifer.VerifyV1OrV2(c.Current, c.Parent, c.ParentHash[:], c.CurrentHash[:], c.MixDigest[:], c.RLPHashProof1, c.RLPHashProof2, c.RLPHashVk, c.ToG2HashProof, c.ToG2HashVk, c.ToG2Hash[:])
-}
-
-func readProof(filepath string) groth16.Proof {
-	file, err := os.Open(filepath)
-	if err != nil {
-		panic(err)
-	}
-	proof := groth16.NewProof(ecc.BN254)
-	_, err = proof.ReadFrom(file)
-	if err != nil {
-		panic(err)
-	}
-	return proof
-}
-func writeProof(proof groth16.Proof, filepath string) error {
-	file, err := os.Create(filepath)
-	if err != nil {
-		panic(err)
-	}
-	_, err = proof.WriteTo(file)
-	if err != nil {
-		return err
-	}
-	return file.Close()
 }

@@ -353,6 +353,7 @@ func (hv *HeaderVerifier[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl]) verifyRlpHash(
 	if err != nil {
 		return err
 	}
+
 	err = verifier.AssertProof(RLPHashVk, proof, groth16.Witness[FR]{Public: rlpverifyInputElements}, groth16.WithCompleteArithmetic())
 	if err != nil {
 		return err

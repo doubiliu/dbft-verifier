@@ -327,7 +327,7 @@ func (s *PaddingSlice) Len(api frontend.API) frontend.Variable {
 }
 
 //// Check confirms that the padding is the correct position
-//func (s *PaddingSlice) Check(api frontend.API) {
+//phase (s *PaddingSlice) Check(api frontend.API) {
 //	toCheck := s.Clone()
 //	if !s.IsLittleEndian {
 //		toCheck = s.Reverse(api)

@@ -1,7 +1,10 @@
 package mpc
 
 import (
+	"fmt"
+	"github.com/txhsl/neox-dbft-verifier/utils"
 	"os"
+	"path/filepath"
 
 	"github.com/consensys/gnark/backend/groth16/bn254/mpcsetup"
 )
@@ -15,16 +18,20 @@ import (
  * @return err: error
  */
 func InitPhase1(path string, power uint64) (phase1 mpcsetup.Phase1, err error) {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		return mpcsetup.Phase1{}, fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		return mpcsetup.Phase1{}, fmt.Errorf("failed to create file %s: %w", path, err)
+	}
 	phase1.Initialize(power)
-	f, err := os.Create(path)
+	_, err = phase1.WriteTo(file)
 	if err != nil {
 		return phase1, err
 	}
-	_, err = phase1.WriteTo(f)
-	if err != nil {
-		return phase1, err
-	}
-	err = f.Close()
+	err = file.Close()
 	if err != nil {
 		return phase1, err
 	}
@@ -46,13 +53,8 @@ func ContributePhase1(prevPath string, nextPath string) (next mpcsetup.Phase1, e
 	}
 	prev.Contribute()
 	next = prev
-	f, err := os.Create(nextPath)
-	if err != nil {
-		return next, err
-	}
-	_, err = next.WriteTo(f)
-	if err != nil {
-		return next, err
+	if err = utils.WriteToFile(&next, nextPath); err != nil {
+		return mpcsetup.Phase1{}, nil
 	}
 	return next, nil
 }
@@ -96,13 +98,8 @@ func Seal(phase1Path string, outputPath string) (srs mpcsetup.SrsCommons, err er
 	}
 	beaconChallenge := []byte("beacon Phase 1")
 	srs = prev.Seal(beaconChallenge)
-	f, err := os.Create(outputPath)
-	if err != nil {
-		return srs, err
-	}
-	_, err = srs.WriteTo(f)
-	if err != nil {
-		return srs, err
+	if err = utils.WriteToFile(&srs, outputPath); err != nil {
+		return mpcsetup.SrsCommons{}, err
 	}
 	return srs, nil
 }

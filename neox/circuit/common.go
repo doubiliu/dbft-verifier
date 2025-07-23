@@ -316,7 +316,7 @@ func (header *HeaderParameters) Serialize() []frontend.Variable {
 	return input
 }
 
-//func (header *HeaderParameters) Deserialize(input []frontend.Variable) {
+//phase (header *HeaderParameters) Deserialize(input []frontend.Variable) {
 //	index := 0
 //	copy(header.ParentHash[:], input[index:index+len(header.ParentHash)])
 //	index += len(header.ParentHash)
