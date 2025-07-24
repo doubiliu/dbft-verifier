@@ -1,0 +1,16 @@
+syntax = "proto3";// 协议为proto3
+
+package proto;
+option go_package="/agg_task";
+
+message AggRequest{
+  string height = 1;
+  string proof = 2;
+}
+message AggResponse{
+  string value = 1;
+}
+
+service AggCalculateService{
+  rpc AddAggCalculateTask (AggRequest) returns (AggResponse){}
+}

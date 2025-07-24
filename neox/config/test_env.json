@@ -1,0 +1,21 @@
+{
+  "local_sever": {
+    "address": "localhost",
+    "port": "8080"
+  },
+  "agg_sever": {
+    "address": "localhost",
+    "port": "8080"
+  },
+  "sub_severs": [
+    {
+    "address": "localhost1",
+    "port": "8080"
+  },
+    {
+      "address": "localhost2",
+      "port": "8080"
+    }
+  ],
+  "neox_node": "https://neoxt4seed1.ngd.network/"
+}
