@@ -45,7 +45,7 @@ func TestMultiSigVerifyCircuit(t *testing.T) {
     "withdrawalsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
 }`,
 	))
-	data, err := encodeHeader(header, true)
+	data, err := EncodeHeader(header, true)
 	if err != nil {
 		panic(err)
 	}

@@ -23,7 +23,7 @@ func TestHeaderEncoderV0(t *testing.T) {
 	_, current := HeaderTestData(ExtraV0)
 	pheader, err := GetHeaderParamter(current)
 
-	data, err := encodeHeader(current, false)
+	data, err := EncodeHeader(current, false)
 	//data, err := encodeSigHeader(header)
 	if err != nil {
 		panic(err)
@@ -58,7 +58,7 @@ func TestHeaderEncoderV1(t *testing.T) {
 	_, current := HeaderTestData(ExtraV1)
 	pheader, err := GetHeaderParamter(current)
 
-	data, err := encodeHeader(current, false)
+	data, err := EncodeHeader(current, false)
 	//data, err := encodeSigHeader(header)
 	if err != nil {
 		panic(err)
@@ -92,7 +92,7 @@ func TestHeaderEncoderV2(t *testing.T) {
 	_, current := HeaderTestData(ExtraV2)
 	pheader, err := GetHeaderParamter(current)
 
-	data, err := encodeHeader(current, false)
+	data, err := EncodeHeader(current, false)
 	//data, err := encodeSigHeader(header)
 	if err != nil {
 		panic(err)
@@ -128,7 +128,7 @@ func TestRLPEncodeVerifyCircuit(t *testing.T) {
 	header, _ := HeaderTestData(extraVersion)
 	pheader, err := GetCompressedHeaderParameters(header)
 	assert.NoError(err)
-	data, err := encodeHeader(header, false)
+	data, err := EncodeHeader(header, false)
 	if err != nil {
 		panic(err)
 	}
@@ -212,7 +212,7 @@ func TestNoSigHeaderRLPEncodeCircuit(t *testing.T) {
 	header, _ := HeaderTestData(ExtraV0) // must be ExtraV0, in ExtraV1 we use hash to g2
 	pheader, err := GetCompressedHeaderParameters(header)
 	assert.NoError(err)
-	data, err := encodeHeader(header, true) // no sig
+	data, err := EncodeHeader(header, true) // no sig
 	if err != nil {
 		panic(err)
 	}
@@ -286,7 +286,7 @@ func TestHeaderHashToG2VerifyCircuit(t *testing.T) {
 	_, header := HeaderTestData(ExtraV1)
 	cheader, err := GetCompressedHeaderParameters(header)
 	assert.NoError(err)
-	data, err := encodeHeader(header, true)
+	data, err := EncodeHeader(header, true)
 	if err != nil {
 		panic(err)
 	}

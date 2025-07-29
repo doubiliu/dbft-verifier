@@ -3,18 +3,22 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
-	"github.com/consensys/gnark/constraint"
+	"github.com/consensys/gnark/backend/witness"
+	"github.com/txhsl/neox-dbft-verifier/circuit"
+	"github.com/txhsl/neox-dbft-verifier/helper"
 	"sync"
 )
 
 type PipeScheduler struct {
 	nbSolve    int
 	nbProve    int
+	instances  []*PackedCircuitInstance
 	solver     *PipelineSolver
 	prover     *PipelineProver
-	Response   <-chan ProveResponse // Response is now read-only
-	solveInput chan<- SolveRequest  // solveInput is now write-only
+	Response   <-chan ProveResponse
+	solveInput chan<- SolveRequest
 	feedback   chan error
 	cancel     context.CancelFunc
 	wg         *sync.WaitGroup
@@ -62,21 +66,40 @@ func (scheduler *PipeScheduler) Errors() <-chan error {
 	return scheduler.feedback
 }
 
-func NewPipelineScheduler(nbSolve, nbProve, pendingSize int, ccs constraint.ConstraintSystem, pk groth16.ProvingKey, vk groth16.VerifyingKey) *PipeScheduler {
+func NewPipelineScheduler(nbSolve, nbProve, pendingSize int, instanceConfig map[circuit.CircuitEnum]InstanceConfig) (*PipeScheduler, error) {
 	solveInputs := make(chan SolveRequest, pendingSize)
 	proveInputs := make(chan ProveRequest, pendingSize)
 	responses := make(chan ProveResponse, pendingSize)
-	feedback := make(chan error, nbSolve+nbProve) // Buffer for potential concurrent errors
+	feedback := make(chan error, pendingSize) // Buffer for potential concurrent errors
 
 	var wg sync.WaitGroup
-
-	// Note: We are creating two separate feedback channels for solver and prover,
-	// which will be funneled into the main scheduler feedback channel.
-	solverFeedback := make(chan error, nbSolve)
-	proverFeedback := make(chan error, nbProve)
-
-	solver := NewPipelineSolver(&wg, ccs, pk, solveInputs, proveInputs, solverFeedback)
-	prover := NewPipelineProver(&wg, pk, proveInputs, responses, proverFeedback)
+	// fix functions
+	solveFuncs := make(map[circuit.CircuitEnum]func(w witness.Witness, opts ...backend.ProverOption) (any, error))
+	proveFuncs := make(map[circuit.CircuitEnum]func(solution any) (groth16.Proof, error))
+	for ce, config := range instanceConfig {
+		// load ccs, pk, vk
+		ccs, err := helper.ReadCCS(config.ccsPath)
+		if err != nil {
+			return nil, err
+		}
+		pk, err := helper.ReadProvingKey(config.pkPath)
+		if err != nil {
+			return nil, err
+		}
+		// todo vk can be delete
+		//vk, err := helper.ReadVerifyingKey(config.vkPath)
+		//if err != nil {
+		//	return nil, err
+		//}
+		solveFuncs[ce] = func(w witness.Witness, opts ...backend.ProverOption) (any, error) {
+			return groth16.Solve(ccs, pk, w, opts...)
+		}
+		proveFuncs[ce] = func(solution any) (groth16.Proof, error) {
+			return groth16.ProofComputing(solution, pk)
+		}
+	}
+	solver := NewPipelineSolver(&wg, solveFuncs, solveInputs, proveInputs, feedback)
+	prover := NewPipelineProver(&wg, proveFuncs, proveInputs, responses, feedback)
 
 	scheduler := &PipeScheduler{
 		nbSolve:    nbSolve,
@@ -85,16 +108,9 @@ func NewPipelineScheduler(nbSolve, nbProve, pendingSize int, ccs constraint.Cons
 		prover:     prover,
 		Response:   responses,
 		solveInput: solveInputs,
-		feedback:   feedback, // This is the main, unified feedback channel
+		feedback:   feedback,
 		wg:         &wg,
 	}
 
-	// This is a bit of a hack to wire the internal feedback channels to the main one.
-	// We need to do this because the solver/prover don't know about the main scheduler.
-	// A better design might involve passing the main feedback channel directly,
-	// but this works and keeps components decoupled.
-	scheduler.solver.feedback = solverFeedback
-	scheduler.prover.feedback = proverFeedback
-
-	return scheduler
+	return scheduler, nil
 }

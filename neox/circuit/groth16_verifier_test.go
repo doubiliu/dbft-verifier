@@ -27,7 +27,7 @@ func TestGroth16Verifier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pdata, err := encodeHeader(current, true)
+	pdata, err := EncodeHeader(current, true)
 	if err != nil {
 		panic(err)
 	}

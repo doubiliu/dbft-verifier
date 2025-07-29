@@ -3,20 +3,20 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/consensys/gnark/backend/groth16"
-	"github.com/consensys/gnark/constraint"
+	"github.com/consensys/gnark/backend"
+	"github.com/consensys/gnark/backend/witness"
+	"github.com/txhsl/neox-dbft-verifier/circuit"
 	"sync"
 	"time"
 )
 
 // PipelineSolver processes "witness generation" and commitment
 type PipelineSolver struct {
-	pk       groth16.ProvingKey
-	ccs      constraint.ConstraintSystem
-	input    <-chan SolveRequest // Input is now read-only
-	output   chan<- ProveRequest // Output is now write-only
-	feedback chan<- error        // Feedback is now write-only
-	wg       *sync.WaitGroup
+	solveFunc map[circuit.CircuitEnum]func(witness witness.Witness, opts ...backend.ProverOption) (any, error)
+	input     <-chan SolveRequest
+	output    chan<- ProveRequest
+	feedback  chan<- error
+	wg        *sync.WaitGroup
 }
 
 func (solver *PipelineSolver) Start(ctx context.Context, nbParallel int) {
@@ -55,12 +55,17 @@ func (solver *PipelineSolver) solve(request SolveRequest, control chan struct{},
 		fmt.Println("Solver: finish solve request")
 	}()
 	start := time.Now()
-	witness, err := request.Witness()
+	w, err := request.Witness(request.CircuitEnum())
 	if err != nil {
 		solver.feedback <- err
 		return
 	}
-	solution, err := groth16.Solve(solver.ccs, solver.pk, witness, request.opts...)
+	solve, ok := solver.solveFunc[request.CircuitEnum()]
+	if !ok {
+		solver.feedback <- fmt.Errorf("unsupported circuit type: %d", request.CircuitEnum())
+	}
+	solution, err := solve(w, request.opts...)
+	//solution, err := groth16.Solve(solver.ccs, solver.pk, w, request.opts...)
 	fmt.Println("solve time: ", time.Since(start))
 	if err != nil {
 		// Non-blocking send for error
@@ -71,17 +76,16 @@ func (solver *PipelineSolver) solve(request SolveRequest, control chan struct{},
 		return
 	}
 
-	proveRequest := NewProveRequest(request.Request, solution, request.opts...)
+	proveRequest := NewProveRequest(request, solution)
 	solver.output <- proveRequest
 }
 
-func NewPipelineSolver(wg *sync.WaitGroup, ccs constraint.ConstraintSystem, pk groth16.ProvingKey, input <-chan SolveRequest, output chan<- ProveRequest, feedback chan<- error) *PipelineSolver {
+func NewPipelineSolver(wg *sync.WaitGroup, solveFunc map[circuit.CircuitEnum]func(w witness.Witness, opts ...backend.ProverOption) (any, error), input <-chan SolveRequest, output chan<- ProveRequest, feedback chan<- error) *PipelineSolver {
 	return &PipelineSolver{
-		pk:       pk,
-		ccs:      ccs,
-		input:    input,
-		output:   output,
-		feedback: feedback,
-		wg:       wg,
+		solveFunc: solveFunc,
+		input:     input,
+		output:    output,
+		feedback:  feedback,
+		wg:        wg,
 	}
 }

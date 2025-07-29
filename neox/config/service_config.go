@@ -1,13 +1,34 @@
 package config
 
+import (
+	"fmt"
+	"time"
+)
+
 type ServiceConfig struct {
-	Local BaseServerInfo   `json:"local_sever"`
-	Agg   BaseServerInfo   `json:"agg_sever"`
-	Sub   []BaseServerInfo `json:"sub_severs"`
-	Node  string           `json:"neox_node"`
+	ID      NodeID
+	Network NetworkConfig
+	Local   BaseURL
+	GrpcConfig
 }
 
-type BaseServerInfo struct {
+type NodeID = int
+type NetworkConfig struct {
+	Aggregator  BaseURL            `json:"agg_sever"`
+	Workers     map[NodeID]BaseURL `json:"node_severs"`
+	BlockSource string             `json:"block_source"`
+}
+
+type BaseURL struct {
 	Address string `json:"address"`
-	Port    string `json:"port"`
+	Port    int    `json:"port"`
+}
+
+func (url *BaseURL) String() string {
+	return fmt.Sprintf("%s:%d", url.Address, url.Port)
+}
+
+type GrpcConfig struct {
+	MessageLimitSize int
+	Timeout          time.Duration
 }

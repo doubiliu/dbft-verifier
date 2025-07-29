@@ -69,6 +69,7 @@ func GetInitParamsFromExistedMPCSetUp(ccs constraint.ConstraintSystem, srsPath s
 		return nil, nil, err
 	}
 	// Generate proving and verifying keys
+	fmt.Println("start get pk, vk")
 	pk, vk := phase2.Seal(&srs, &evals, []byte("beacon Phase 2"))
 	return pk.(*groth16.ProvingKey), vk.(*groth16.VerifyingKey), nil
 }

@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 	"github.com/consensys/gnark/backend/groth16"
+	"github.com/txhsl/neox-dbft-verifier/circuit"
 	"sync"
 	"time"
 )
 
 type PipelineProver struct {
-	pk       groth16.ProvingKey
-	input    <-chan ProveRequest  // Input is now read-only
-	output   chan<- ProveResponse // Output is now write-only
-	feedback chan<- error         // Feedback is now write-only
-	wg       *sync.WaitGroup
+	proveFunc map[circuit.CircuitEnum]func(solution any) (groth16.Proof, error)
+	input     <-chan ProveRequest
+	output    chan<- ProveResponse
+	feedback  chan<- error
+	wg        *sync.WaitGroup
 }
 
 func (prover *PipelineProver) Start(ctx context.Context, nbParallel int) {
@@ -50,7 +51,11 @@ func (prover *PipelineProver) prove(request ProveRequest, control chan struct{},
 		fmt.Println("Prover: finish prove request")
 	}()
 	start := time.Now()
-	proof, err := groth16.ProofComputing(request.Solution, prover.pk)
+	prove, ok := prover.proveFunc[request.CircuitEnum()]
+	if !ok {
+		prover.feedback <- fmt.Errorf("unsupported circuit type: %d", request.CircuitEnum())
+	}
+	proof, err := prove(request.Solution)
 	fmt.Println("proof time: ", time.Since(start))
 	if err != nil {
 		select {
@@ -59,15 +64,15 @@ func (prover *PipelineProver) prove(request ProveRequest, control chan struct{},
 		}
 		return
 	}
-	prover.output <- NewProveResponse(request.Request, proof)
+	prover.output <- NewProveResponse(request.Request, proof, request.CircuitEnum())
 }
 
-func NewPipelineProver(wg *sync.WaitGroup, pk groth16.ProvingKey, input <-chan ProveRequest, output chan<- ProveResponse, feedback chan<- error) *PipelineProver {
+func NewPipelineProver(wg *sync.WaitGroup, proveFunc map[circuit.CircuitEnum]func(solution any) (groth16.Proof, error), input <-chan ProveRequest, output chan<- ProveResponse, feedback chan<- error) *PipelineProver {
 	return &PipelineProver{
-		pk:       pk,
-		input:    input,
-		output:   output,
-		feedback: feedback,
-		wg:       wg,
+		proveFunc: proveFunc,
+		input:     input,
+		output:    output,
+		feedback:  feedback,
+		wg:        wg,
 	}
 }

@@ -233,7 +233,7 @@ will convert Phase1 data to common srs,each participant can execute this operati
 							},
 							{
 								Name:   "outer",
-								Action: initInnerCircuitPhase2,
+								Action: initOuterCircuitPhase2,
 								Flags: []cli.Flag{
 									srsFileFlag,
 									outputFileFlag,
@@ -289,6 +289,7 @@ will convert Phase1 data to common srs,each participant can execute this operati
 					verifyingKeyFileFlag,
 					ccsFileFlag, // is input, we have compiled in init
 					circuitFlag,
+					contractFileFlag,
 				},
 				Action: sealCircuit,
 				Description: `
@@ -402,9 +403,9 @@ func sealCircuit(ctx *cli.Context) error {
 		return errors.New("invalid verifyingkey file path")
 	}
 	contractFilePath := ctx.Path(contractFileFlag.Name)
-	if contractFilePath == "" {
-		return errors.New("invalid contract file path")
-	}
+	//if contractFilePath == "" {
+	//	return errors.New("invalid contract file path")
+	//}
 	r1csFilePath := ctx.Path(ccsFileFlag.Name)
 	if r1csFilePath == "" {
 		return errors.New("invalid r1cs file path")
@@ -413,11 +414,13 @@ func sealCircuit(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("read ccs")
 	// Generate node private key
 	pk, vk, err := helper.GetInitParamsFromExistedMPCSetUp(ccs, srsFilePath, phase2FilePath)
 	if err != nil {
 		return err
 	}
+	fmt.Println("finish pk, vk")
 	err = helper.ExportProvingKey(pk, provingKeyFilePath)
 	if err != nil {
 		return err
@@ -426,7 +429,9 @@ func sealCircuit(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	err = helper.ExportContract(vk, contractFilePath)
+	if contractFilePath != "" {
+		err = helper.ExportContract(vk, contractFilePath)
+	}
 	if err != nil {
 		return err
 	}

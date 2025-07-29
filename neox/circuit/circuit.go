@@ -27,6 +27,7 @@ const (
 	RlpHash CircuitEnum = iota
 	NoSigRlp
 	ToG2Hash
+	OuterAgg
 	Invalid
 )
 
@@ -121,23 +122,21 @@ func (c *HeaderRLPEncodeVerifyWrapper) Instance(extraVersion byte, isNoSig bool,
 	if err != nil {
 		return nil, nil, err
 	}
-	data, err := encodeHeader(header, isNoSig)
+	data, err := EncodeHeader(header, isNoSig)
 	if err != nil {
 		panic(err)
 	}
+	data = common.BytesToHash(crypto.Keccak256(data)).Bytes()
 	r1 := new(big.Int).SetBytes(data[:16])
 	r2 := new(big.Int).SetBytes(data[16:])
-	data = common.BytesToHash(crypto.Keccak256(data)).Bytes()
 	return &HeaderRLPEncodeVerifyWrapper{
 			Header:       pheader,
 			RlpHash:      [2]frontend.Variable{0, 0},
 			extraVersion: extraVersion,
 			isNoSig:      isNoSig,
 		}, &HeaderRLPEncodeVerifyWrapper{
-			Header:       pheader,
-			RlpHash:      [2]frontend.Variable{r1, r2},
-			extraVersion: extraVersion,
-			isNoSig:      isNoSig,
+			Header:  pheader,
+			RlpHash: [2]frontend.Variable{r1, r2},
 		}, nil
 }
 
@@ -186,7 +185,7 @@ func (c *HeaderHashToG2VerifyWrapper) Instance(headerGenerator func() (*types.He
 	if err != nil {
 		return nil, nil, err
 	}
-	data, err := encodeHeader(header, true)
+	data, err := EncodeHeader(header, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -257,7 +256,7 @@ func GetExtraV0VerifierCircuit(headerGenerator func() (*types.Header, *types.Hea
 		sigs[i] = sigBytes[i*crypto.SignatureLength : (i+1)*crypto.SignatureLength]
 	}
 
-	data, err := encodeHeader(current, true)
+	data, err := EncodeHeader(current, true)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +299,7 @@ func GetExtraV0VerifierCircuit(headerGenerator func() (*types.Header, *types.Hea
 	for i := 0; i < len(indexVariables); i++ {
 		indexVariables[i] = addressIndices[i]
 	}
-	pdata, err := encodeHeader(parent, false)
+	pdata, err := EncodeHeader(parent, false)
 	if err != nil {
 		panic(err)
 	}
@@ -310,7 +309,7 @@ func GetExtraV0VerifierCircuit(headerGenerator func() (*types.Header, *types.Hea
 	for i := 0; i < len(ParentHash); i++ {
 		ParentHash[i] = pdata[i]
 	}
-	cdata, err := encodeHeader(current, false)
+	cdata, err := EncodeHeader(current, false)
 	if err != nil {
 		panic(err)
 	}
@@ -366,7 +365,7 @@ func GetExtraV0VerifierAssignment(headerGenerator func() (*types.Header, *types.
 		sigs[i] = sigBytes[i*crypto.SignatureLength : (i+1)*crypto.SignatureLength]
 	}
 
-	data, err := encodeHeader(current, true)
+	data, err := EncodeHeader(current, true)
 	if err != nil {
 		return nil, err
 	}
@@ -409,7 +408,7 @@ func GetExtraV0VerifierAssignment(headerGenerator func() (*types.Header, *types.
 	for i := 0; i < len(indexVariables); i++ {
 		indexVariables[i] = addressIndices[i]
 	}
-	pdata, err := encodeHeader(parent, false)
+	pdata, err := EncodeHeader(parent, false)
 	if err != nil {
 		panic(err)
 	}
@@ -419,7 +418,7 @@ func GetExtraV0VerifierAssignment(headerGenerator func() (*types.Header, *types.
 	for i := 0; i < len(ParentHash); i++ {
 		ParentHash[i] = pdata[i]
 	}
-	cdata, err := encodeHeader(current, false)
+	cdata, err := EncodeHeader(current, false)
 	if err != nil {
 		panic(err)
 	}
@@ -433,7 +432,7 @@ func GetExtraV0VerifierAssignment(headerGenerator func() (*types.Header, *types.
 	for i := 0; i < len(MixDigest); i++ {
 		MixDigest[i] = current.MixDigest[i]
 	}
-	rlpHashVerifyProof1, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashCcs, &rlpHashPk, &rlpHashVk, parent, false)
+	rlpHashVerifyProof1, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashCcs, rlpHashPk, rlpHashVk, parent, false)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +440,7 @@ func GetExtraV0VerifierAssignment(headerGenerator func() (*types.Header, *types.
 	if err != nil {
 		return nil, err
 	}
-	rlpHashVerifyProof2, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashCcs, &rlpHashPk, &rlpHashVk, current, false)
+	rlpHashVerifyProof2, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashCcs, rlpHashPk, rlpHashVk, current, false)
 	if err != nil {
 		return nil, err
 	}
@@ -449,7 +448,7 @@ func GetExtraV0VerifierAssignment(headerGenerator func() (*types.Header, *types.
 	if err != nil {
 		return nil, err
 	}
-	noSigHashProof, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), noSigRlpHashCcs, &noSigRlpHashPk, &noSigRlpHashVk, current, true)
+	noSigHashProof, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), noSigRlpHashCcs, noSigRlpHashPk, noSigRlpHashVk, current, true)
 	if err != nil {
 		return nil, err
 	}
@@ -529,7 +528,7 @@ func GetExtraV1OrV2VerifierCircuit(extraVersion byte,
 	g1.Neg(&g1)
 	var sig bls12381.G2Affine
 	_, err = sig.SetBytes(sigBytes)
-	data, err := encodeHeader(current, true)
+	data, err := EncodeHeader(current, true)
 	if err != nil {
 		panic(err)
 	}
@@ -539,7 +538,7 @@ func GetExtraV1OrV2VerifierCircuit(extraVersion byte,
 	for i := 0; i < len(ToG2Hash); i++ {
 		ToG2Hash[i] = hashBytes[i]
 	}
-	pdata, err := encodeHeader(parent, false)
+	pdata, err := EncodeHeader(parent, false)
 	if err != nil {
 		panic(err)
 	}
@@ -549,7 +548,7 @@ func GetExtraV1OrV2VerifierCircuit(extraVersion byte,
 	for i := 0; i < len(ParentHash); i++ {
 		ParentHash[i] = pdata[i]
 	}
-	cdata, err := encodeHeader(current, false)
+	cdata, err := EncodeHeader(current, false)
 	if err != nil {
 		panic(err)
 	}
@@ -587,9 +586,9 @@ func GetExtraV1OrV2VerifierCircuit(extraVersion byte,
 }
 func GetExtraV1OrV2VerifierAssignment(extraVersion byte,
 	headerGenerator func(extraVersion byte) (*types.Header, *types.Header, error),
-	rlpHashCcs, toG2HashCcs constraint.ConstraintSystem,
-	rlpHashPk, toG2HashPk groth16.ProvingKey,
-	rlpHashVk, toG2HashVk groth16.VerifyingKey) (frontend.Circuit, error) {
+	parentRlpHashProof func() (groth16.Proof, error),
+	currentRlpHashProof func() (groth16.Proof, error),
+	toG2HashProof func() (groth16.Proof, error)) (frontend.Circuit, error) {
 	parent, current, err := headerGenerator(extraVersion)
 	if err != nil {
 		return nil, err
@@ -613,7 +612,7 @@ func GetExtraV1OrV2VerifierAssignment(extraVersion byte,
 	g1.Neg(&g1)
 	var sig bls12381.G2Affine
 	_, err = sig.SetBytes(sigBytes)
-	data, err := encodeHeader(current, true)
+	data, err := EncodeHeader(current, true)
 	if err != nil {
 		panic(err)
 	}
@@ -623,7 +622,7 @@ func GetExtraV1OrV2VerifierAssignment(extraVersion byte,
 	for i := 0; i < len(ToG2Hash); i++ {
 		ToG2Hash[i] = hashBytes[i]
 	}
-	pdata, err := encodeHeader(parent, false)
+	pdata, err := EncodeHeader(parent, false)
 	if err != nil {
 		panic(err)
 	}
@@ -633,7 +632,7 @@ func GetExtraV1OrV2VerifierAssignment(extraVersion byte,
 	for i := 0; i < len(ParentHash); i++ {
 		ParentHash[i] = pdata[i]
 	}
-	cdata, err := encodeHeader(current, false)
+	cdata, err := EncodeHeader(current, false)
 	if err != nil {
 		panic(err)
 	}
@@ -647,39 +646,50 @@ func GetExtraV1OrV2VerifierAssignment(extraVersion byte,
 	for i := 0; i < len(MixDigest); i++ {
 		MixDigest[i] = current.MixDigest[i]
 	}
-
-	rlpHashVerifyProof1, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashCcs, &rlpHashPk, &rlpHashVk, parent, false)
+	rlpHashVerifyProof1, err := parentRlpHashProof()
 	if err != nil {
 		return nil, err
 	}
+	rlpHashVerifyProof2, err := currentRlpHashProof()
+	if err != nil {
+		return nil, err
+	}
+	toG2Proof, err := toG2HashProof()
+	if err != nil {
+		return nil, err
+	}
+	//rlpHashVerifyProof1, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashCcs, &rlpHashPk, &rlpHashVk, parent, false)
+	//if err != nil {
+	//	return nil, err
+	//}
 	rlpProof1, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashVerifyProof1)
 	if err != nil {
 		return nil, err
 	}
-	rlpHashVerifyProof2, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashCcs, &rlpHashPk, &rlpHashVk, current, false)
-	if err != nil {
-		return nil, err
-	}
+	//rlpHashVerifyProof2, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashCcs, &rlpHashPk, &rlpHashVk, current, false)
+	//if err != nil {
+	//	return nil, err
+	//}
 	rlpProof2, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashVerifyProof2)
 	if err != nil {
 		return nil, err
 	}
-	toG2HashProof, _, err := ComputeToG2HashProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), toG2HashCcs, &toG2HashPk, &toG2HashVk, current)
+	//toG2HashProof, _, err := ComputeToG2HashProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), toG2HashCcs, &toG2HashPk, &toG2HashVk, current)
+	//if err != nil {
+	//	return nil, err
+	//}
+	g2Proof, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](toG2Proof)
 	if err != nil {
 		return nil, err
 	}
-	g2Proof, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](toG2HashProof)
-	if err != nil {
-		return nil, err
-	}
-	rlpKey, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](rlpHashVk)
-	if err != nil {
-		return nil, err
-	}
-	g2Key, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](toG2HashVk)
-	if err != nil {
-		return nil, err
-	}
+	//rlpKey, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](rlpHashVk)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//g2Key, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](toG2HashVk)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	return &ExtraV1OrV2HeaderVerifyWrapper[emulated.Secp256k1Fp, emulated.Secp256k1Fr, sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
 		Parent:        pparent,
@@ -691,8 +701,9 @@ func GetExtraV1OrV2VerifierAssignment(extraVersion byte,
 		ParentHash:    ParentHash,
 		CurrentHash:   CurrentHash,
 		MixDigest:     MixDigest,
-		RLPHashVk:     rlpKey,
-		ToG2HashVk:    g2Key,
+		// we need vk is fixed in circuit, use `gnark:"-"`
+		//RLPHashVk:     rlpKey,
+		//ToG2HashVk:    g2Key,
 	}, nil
 }
 

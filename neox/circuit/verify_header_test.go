@@ -45,7 +45,7 @@ func TestVerifyHeaderV0(t *testing.T) {
 		sigs[i] = sigBytes[i*crypto.SignatureLength : (i+1)*crypto.SignatureLength]
 	}
 
-	data, err := encodeHeader(current, true)
+	data, err := EncodeHeader(current, true)
 	fmt.Println("sigHeader RLP: ", data)
 	assert.NoError(t, err)
 	hasher := sha3.NewLegacyKeccak256()
@@ -86,12 +86,12 @@ func TestVerifyHeaderV0(t *testing.T) {
 		indexVariables[i] = addressIndices[i]
 	}
 
-	rlpHashVerifyCcs, err := helper.ReadCCS("rlp_encode_hash_extra_v0_test.ccs")
+	rlpHashVerifyCcs, err := helper.ReadCCS("/root/neo/dbft-verifier/neox/cmd/meta/v1/rlp_encode_hash_extra_v0_test.ccs")
 	if err != nil {
 		panic(err)
 	}
 	var rlpHashVerifyVk groth16.VerifyingKey
-	rlpHashVerifyVk, err = helper.ReadVerifyingKey("rlp_encode_hash_extra_v0_test.vk")
+	rlpHashVerifyVk, err = helper.ReadVerifyingKey("/root/neo/dbft-verifier/neox/cmd/meta/v1/rlp_encode_hash_extra_v0_test.vk")
 	if err != nil {
 		panic(err)
 	}
@@ -100,12 +100,12 @@ func TestVerifyHeaderV0(t *testing.T) {
 		panic(err)
 	}
 	var rlpHashVerifyPk groth16.ProvingKey
-	rlpHashVerifyPk, err = helper.ReadProvingKey("rlp_encode_hash_extra_v0_test.pk")
+	rlpHashVerifyPk, err = helper.ReadProvingKey("/root/neo/dbft-verifier/neox/cmd/meta/v1/rlp_encode_hash_extra_v0_test.pk")
 	if err != nil {
 		panic(err)
 	}
 	start := time.Now()
-	rlpHashVerifyProof1, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, &rlpHashVerifyPk, &rlpHashVerifyVk, parent, false)
+	rlpHashVerifyProof1, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, rlpHashVerifyPk, rlpHashVerifyVk, parent, false)
 	if err != nil {
 		panic(err)
 	}
@@ -120,7 +120,7 @@ func TestVerifyHeaderV0(t *testing.T) {
 	}
 	//rlpHashVerifyProof2 := readProof("rlp_hash_2_v0.proof")
 	start = time.Now()
-	rlpHashVerifyProof2, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, &rlpHashVerifyPk, &rlpHashVerifyVk, current, false)
+	rlpHashVerifyProof2, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, rlpHashVerifyPk, rlpHashVerifyVk, current, false)
 	if err != nil {
 		panic(err)
 	}
@@ -152,7 +152,7 @@ func TestVerifyHeaderV0(t *testing.T) {
 		panic(err)
 	}
 	start = time.Now()
-	noSigHashProof, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), noSigHashCCS, &noSigHashPk, &noSigHashVk, current, true)
+	noSigHashProof, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), noSigHashCCS, noSigHashPk, noSigHashVk, current, true)
 	if err != nil {
 		panic(err)
 	}
@@ -165,7 +165,7 @@ func TestVerifyHeaderV0(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	pdata, err := encodeHeader(parent, false)
+	pdata, err := EncodeHeader(parent, false)
 	if err != nil {
 		panic(err)
 	}
@@ -175,7 +175,7 @@ func TestVerifyHeaderV0(t *testing.T) {
 	for i := 0; i < len(ParentHash); i++ {
 		ParentHash[i] = pdata[i]
 	}
-	cdata, err := encodeHeader(current, false)
+	cdata, err := EncodeHeader(current, false)
 	if err != nil {
 		panic(err)
 	}
@@ -292,7 +292,7 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	g1.Neg(&g1)
 	var sig bls12381.G2Affine
 	_, err = sig.SetBytes(sigBytes)
-	data, err := encodeHeader(current, true)
+	data, err := EncodeHeader(current, true)
 	if err != nil {
 		panic(err)
 	}
@@ -312,17 +312,17 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	rlpKey, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](rlpHashVerifyVk)
-	if err != nil {
-		panic(err)
-	}
+	//rlpKey, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](rlpHashVerifyVk)
+	//if err != nil {
+	//	panic(err)
+	//}
 	var rlpHashVerifyPk groth16.ProvingKey
 	rlpHashVerifyPk, err = helper.ReadProvingKey("rlp_encode_hash_extra_v1_test.pk")
 	if err != nil {
 		panic(err)
 	}
 	start := time.Now()
-	rlpHashVerifyProof1, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, &rlpHashVerifyPk, &rlpHashVerifyVk, parent, false)
+	rlpHashVerifyProof1, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, rlpHashVerifyPk, rlpHashVerifyVk, parent, false)
 	if err != nil {
 		panic(err)
 	}
@@ -337,7 +337,7 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	}
 	//rlpHashVerifyProof2 := readProof("rlp_hash_2_v1.proof")
 	start = time.Now()
-	rlpHashVerifyProof2, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, &rlpHashVerifyPk, &rlpHashVerifyVk, current, false)
+	rlpHashVerifyProof2, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashVerifyCcs, rlpHashVerifyPk, rlpHashVerifyVk, current, false)
 	if err != nil {
 		panic(err)
 	}
@@ -358,17 +358,17 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	g2Key, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](toG2HashVerifyVk)
-	if err != nil {
-		panic(err)
-	}
+	//g2Key, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](toG2HashVerifyVk)
+	//if err != nil {
+	//	panic(err)
+	//}
 	var toG2HashVerifyPk groth16.ProvingKey
 	toG2HashVerifyPk, err = helper.ReadProvingKey("to_g2_hash.pk")
 	if err != nil {
 		panic(err)
 	}
 	start = time.Now()
-	tog2HashVerifyProof, _, err := ComputeToG2HashProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), toG2HashVerifyCcs, &toG2HashVerifyPk, &toG2HashVerifyVk, current)
+	tog2HashVerifyProof, _, err := ComputeToG2HashProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), toG2HashVerifyCcs, toG2HashVerifyPk, toG2HashVerifyVk, current)
 	if err != nil {
 		panic(err)
 	}
@@ -382,7 +382,7 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 		panic(err)
 	}
 
-	pdata, err := encodeHeader(parent, false)
+	pdata, err := EncodeHeader(parent, false)
 	if err != nil {
 		panic(err)
 	}
@@ -392,7 +392,7 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	for i := 0; i < len(ParentHash); i++ {
 		ParentHash[i] = pdata[i]
 	}
-	cdata, err := encodeHeader(current, false)
+	cdata, err := EncodeHeader(current, false)
 	if err != nil {
 		panic(err)
 	}
@@ -407,15 +407,15 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 		MixDigest[i] = current.MixDigest[i]
 	}
 
-	circuit := ExtraV1OrV2HeaderVerifyWrapper[emulated.Secp256k1Fp, emulated.Secp256k1Fr, sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
-		Parent:        pparent,
-		Current:       pcurrent,
-		RLPHashVk:     rlpKey,
-		RLPHashProof1: stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashVerifyCcs),
-		RLPHashProof2: stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashVerifyCcs),
-		ToG2HashVk:    g2Key,
-		ToG2HashProof: stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](toG2HashVerifyCcs),
-	}
+	//circuit := ExtraV1OrV2HeaderVerifyWrapper[emulated.Secp256k1Fp, emulated.Secp256k1Fr, sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
+	//	Parent:        pparent,
+	//	Current:       pcurrent,
+	//	RLPHashVk:     rlpKey,
+	//	RLPHashProof1: stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashVerifyCcs),
+	//	RLPHashProof2: stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashVerifyCcs),
+	//	ToG2HashVk:    g2Key,
+	//	ToG2HashProof: stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](toG2HashVerifyCcs),
+	//}
 
 	assignment := ExtraV1OrV2HeaderVerifyWrapper[emulated.Secp256k1Fp, emulated.Secp256k1Fr, sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
 		Parent:        pparent,
@@ -433,15 +433,25 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	//if err != nil {
 	//	panic(err)
 	//}
-	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
+	ccs, err := helper.ReadCCS("verify_header_extra_v1.ccs")
+	//ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println(ccs.GetNbConstraints())
-	pk, vk, err := groth16.Setup(ccs)
+	//pk, vk, err := groth16.Setup(ccs)
+	//if err != nil {
+	//	panic(err)
+	//}
+	pk, err := helper.ReadProvingKey("verify_header_extra_v1.pk")
 	if err != nil {
 		panic(err)
 	}
+	vk, err := helper.ReadVerifyingKey("verify_header_extra_v1.vk")
+	if err != nil {
+		panic(err)
+	}
+
 	start = time.Now()
 	proof, err := groth16.Prove(ccs, pk, w, backend.WithProverHashToFieldFunction(sha256.New()))
 	if err != nil {
@@ -454,11 +464,11 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	}
 	err = groth16.Verify(proof, vk, publicWitness, backend.WithVerifierHashToFieldFunction(sha256.New()))
 	assert.NoError(err)
-	err = helper.ExportCCS(ccs, "verify_header_extra_v1.ccs")
-	assert.NoError(err)
-	err = helper.ExportProvingKey(pk.(*groth16_bn254.ProvingKey), "verify_header_extra_v1.pk")
-	assert.NoError(err)
-	err = helper.ExportVerifyingKey(vk.(*groth16_bn254.VerifyingKey), "verify_header_extra_v1.vk")
-	assert.NoError(err)
+	//err = helper.ExportCCS(ccs, "verify_header_extra_v1.ccs")
+	//assert.NoError(err)
+	//err = helper.ExportProvingKey(pk.(*groth16_bn254.ProvingKey), "verify_header_extra_v1.pk")
+	//assert.NoError(err)
+	//err = helper.ExportVerifyingKey(vk.(*groth16_bn254.VerifyingKey), "verify_header_extra_v1.vk")
+	//assert.NoError(err)
 	helper.GetGroth16ContractInput(proof.(*groth16_bn254.Proof))
 }

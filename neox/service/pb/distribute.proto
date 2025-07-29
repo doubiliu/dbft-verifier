@@ -1,0 +1,15 @@
+syntax = "proto3";// 协议为proto3
+
+package proto;
+option go_package="/distribute";
+
+message BlockDistributeRequest{
+  bytes header = 1; // json
+}
+message BlockDistributeResponse{
+  bool success = 1;
+}
+
+service DistributeService{
+  rpc SendBlock (BlockDistributeRequest) returns (BlockDistributeResponse){}
+}

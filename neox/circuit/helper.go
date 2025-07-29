@@ -25,7 +25,7 @@ import (
 	"math/big"
 )
 
-func encodeHeader(header *types.Header, noSig bool) ([]byte, error) {
+func EncodeHeader(header *types.Header, noSig bool) ([]byte, error) {
 	hashableExtraLen := len(header.Extra)
 	if noSig {
 		switch v := header.Extra[0]; v {
@@ -123,13 +123,13 @@ func publicKeyToVariable(publicKey btcec.PublicKey) ecdsa.PublicKey[emulated.Sec
 	}
 }
 
-func ComputeRLPProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk *groth16.ProvingKey, vk *groth16.VerifyingKey, header *types.Header, IsNoSig bool) (groth16.Proof, witness.Witness, error) {
+func ComputeRLPProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk groth16.ProvingKey, vk groth16.VerifyingKey, header *types.Header, IsNoSig bool) (groth16.Proof, witness.Witness, error) {
 
 	pheader, err := GetCompressedHeaderParameters(header)
 	if err != nil {
 		return nil, nil, err
 	}
-	data, err := encodeHeader(header, IsNoSig) // no sig
+	data, err := EncodeHeader(header, IsNoSig) // no sig
 	if err != nil {
 		return nil, nil, err
 	}
@@ -150,11 +150,11 @@ func ComputeRLPProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk 
 	if err != nil {
 		return nil, nil, err
 	}
-	innerProof, err := groth16.Prove(ccs, *pk, w, stdgroth16.GetNativeProverOptions(outer, field))
+	innerProof, err := groth16.Prove(ccs, pk, w, stdgroth16.GetNativeProverOptions(outer, field))
 	if err != nil {
 		return nil, nil, err
 	}
-	err = groth16.Verify(innerProof, *vk, pubWitness, stdgroth16.GetNativeVerifierOptions(outer, field))
+	err = groth16.Verify(innerProof, vk, pubWitness, stdgroth16.GetNativeVerifierOptions(outer, field))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -162,12 +162,12 @@ func ComputeRLPProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk 
 	return innerProof, pubWitness, nil
 }
 
-func ComputeToG2HashProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk *groth16.ProvingKey, vk *groth16.VerifyingKey, header *types.Header) (groth16.Proof, witness.Witness, error) {
+func ComputeToG2HashProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk groth16.ProvingKey, vk groth16.VerifyingKey, header *types.Header) (groth16.Proof, witness.Witness, error) {
 	cheader, err := GetCompressedHeaderParameters(header)
 	if err != nil {
 		return nil, nil, err
 	}
-	data, err := encodeHeader(header, true)
+	data, err := EncodeHeader(header, true)
 	if err != nil {
 		panic(err)
 	}
@@ -193,11 +193,11 @@ func ComputeToG2HashProof(field, outer *big.Int, ccs constraint.ConstraintSystem
 	if err != nil {
 		return nil, nil, err
 	}
-	innerProof, err := groth16.Prove(ccs, *pk, w, stdgroth16.GetNativeProverOptions(outer, field))
+	innerProof, err := groth16.Prove(ccs, pk, w, stdgroth16.GetNativeProverOptions(outer, field))
 	if err != nil {
 		return nil, nil, err
 	}
-	err = groth16.Verify(innerProof, *vk, innerPubWitness, stdgroth16.GetNativeVerifierOptions(outer, field))
+	err = groth16.Verify(innerProof, vk, innerPubWitness, stdgroth16.GetNativeVerifierOptions(outer, field))
 	if err != nil {
 		return nil, nil, err
 	}

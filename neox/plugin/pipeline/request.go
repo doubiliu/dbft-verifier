@@ -4,19 +4,15 @@ import (
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/backend/witness"
+	"github.com/txhsl/neox-dbft-verifier/circuit"
 )
-
-// BlockProvingRequest represents a request to be proven, which needs to include
-// (1) The requested circuit type, to decide which circuit should be used
-// (2) Block information, to know the final proof is proved for which block
-type BlockProvingRequest struct {
-}
 
 type Request interface {
 	Serialize() ([]byte, error) // todo
 	Deserialize(b []byte) error // todo
-	Witness() (witness.Witness, error)
+	Witness(params ...any) (witness.Witness, error)
 	Option() []backend.ProverOption
+	CircuitEnum() circuit.CircuitEnum
 }
 
 type SolveRequest struct {
@@ -32,27 +28,27 @@ func NewSolveRequest(request Request, opts ...backend.ProverOption) SolveRequest
 }
 
 type ProveRequest struct {
-	Request
+	SolveRequest
 	Solution any
-	opts     []backend.ProverOption
 }
 
-func NewProveRequest(request Request, solution any, opts ...backend.ProverOption) ProveRequest {
+func NewProveRequest(request SolveRequest, solution any) ProveRequest {
 	return ProveRequest{
-		Request:  request,
-		Solution: solution,
-		opts:     opts,
+		SolveRequest: request,
+		Solution:     solution,
 	}
 }
 
 type ProveResponse struct {
 	Request
-	Proof groth16.Proof
+	Proof       groth16.Proof
+	CircuitType circuit.CircuitEnum
 }
 
-func NewProveResponse(request Request, proof groth16.Proof) ProveResponse {
+func NewProveResponse(request Request, proof groth16.Proof, ce circuit.CircuitEnum) ProveResponse {
 	return ProveResponse{
-		Request: request,
-		Proof:   proof,
+		Request:     request,
+		Proof:       proof,
+		CircuitType: ce,
 	}
 }
