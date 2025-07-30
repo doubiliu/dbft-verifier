@@ -3,7 +3,6 @@ package circuit
 import (
 	"fmt"
 	btc_ecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
-	"github.com/consensys/gnark-crypto/ecc"
 	bls12381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
 	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/constraint"
@@ -231,7 +230,10 @@ func (c *ExtraV0HeaderVerifyWrapper[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl]) Def
 	return verifier.VerifyV0(c.Parent, c.Current, c.ParentHash[:], c.CurrentHash[:], c.MixDigest[:], c.RLPHashProof1, c.RLPHashProof2, c.RLPHashVk, c.NoSigHashProof, c.NoSigHashVk, c.NoSigHash[:], c.PublicKeys, c.AddressIndices)
 }
 
-func GetExtraV0VerifierCircuit(headerGenerator func() (*types.Header, *types.Header, error), rlpHashCcs, noSigRlpHashCcs constraint.ConstraintSystem) (frontend.Circuit, error) {
+func GetExtraV0VerifierCircuit(headerGenerator func() (*types.Header, *types.Header, error),
+	rlpHashCcs, noSigRlpHashCcs constraint.ConstraintSystem,
+	rlpHashVk, noSigHashVk groth16.VerifyingKey,
+) (frontend.Circuit, error) {
 	parent, current, err := headerGenerator()
 	if err != nil {
 		return nil, err
@@ -323,14 +325,22 @@ func GetExtraV0VerifierCircuit(headerGenerator func() (*types.Header, *types.Hea
 	for i := 0; i < len(MixDigest); i++ {
 		MixDigest[i] = current.MixDigest[i]
 	}
+	rlpKey, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](rlpHashVk)
+	if err != nil {
+		return nil, err
+	}
+	noSigKey, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](noSigHashVk)
+	if err != nil {
+		return nil, err
+	}
 	circuit := ExtraV0HeaderVerifyWrapper[emulated.Secp256k1Fp, emulated.Secp256k1Fr, sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
 		Parent:         parentParameters,
 		Current:        currentParameters,
 		RLPHashProof1:  stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashCcs),
 		RLPHashProof2:  stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashCcs),
-		RLPHashVk:      stdgroth16.PlaceholderVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](rlpHashCcs),
+		RLPHashVk:      rlpKey,
 		NoSigHashProof: stdgroth16.PlaceholderProof[sw_bn254.G1Affine, sw_bn254.G2Affine](noSigRlpHashCcs),
-		NoSigHashVk:    stdgroth16.PlaceholderVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](noSigRlpHashCcs),
+		NoSigHashVk:    noSigKey,
 		PublicKeys:     publicKeys,
 		AddressIndices: indexVariables,
 	}
@@ -338,9 +348,10 @@ func GetExtraV0VerifierCircuit(headerGenerator func() (*types.Header, *types.Hea
 }
 
 func GetExtraV0VerifierAssignment(headerGenerator func() (*types.Header, *types.Header, error),
-	rlpHashCcs, noSigRlpHashCcs constraint.ConstraintSystem,
-	rlpHashPk, noSigRlpHashPk groth16.ProvingKey,
-	rlpHashVk, noSigRlpHashVk groth16.VerifyingKey) (frontend.Circuit, error) {
+	parentRlpHashProof func() (groth16.Proof, error),
+	currentRlpHashProof func() (groth16.Proof, error),
+	noSigHashProof func() (groth16.Proof, error),
+) (frontend.Circuit, error) {
 	parent, current, err := headerGenerator()
 	if err != nil {
 		return nil, err
@@ -432,7 +443,15 @@ func GetExtraV0VerifierAssignment(headerGenerator func() (*types.Header, *types.
 	for i := 0; i < len(MixDigest); i++ {
 		MixDigest[i] = current.MixDigest[i]
 	}
-	rlpHashVerifyProof1, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashCcs, rlpHashPk, rlpHashVk, parent, false)
+	rlpHashVerifyProof1, err := parentRlpHashProof()
+	if err != nil {
+		return nil, err
+	}
+	rlpHashVerifyProof2, err := currentRlpHashProof()
+	if err != nil {
+		return nil, err
+	}
+	noSigProof, err := noSigHashProof()
 	if err != nil {
 		return nil, err
 	}
@@ -440,27 +459,11 @@ func GetExtraV0VerifierAssignment(headerGenerator func() (*types.Header, *types.
 	if err != nil {
 		return nil, err
 	}
-	rlpHashVerifyProof2, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), rlpHashCcs, rlpHashPk, rlpHashVk, current, false)
-	if err != nil {
-		return nil, err
-	}
 	rlpProof2, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](rlpHashVerifyProof2)
 	if err != nil {
 		return nil, err
 	}
-	noSigHashProof, _, err := ComputeRLPProof(ecc.BN254.ScalarField(), ecc.BN254.ScalarField(), noSigRlpHashCcs, noSigRlpHashPk, noSigRlpHashVk, current, true)
-	if err != nil {
-		return nil, err
-	}
-	noSigProof, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](noSigHashProof)
-	if err != nil {
-		return nil, err
-	}
-	rlpKey, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](rlpHashVk)
-	if err != nil {
-		return nil, err
-	}
-	noSigKey, err := stdgroth16.ValueOfVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](rlpHashVk)
+	noSigRlpProof, err := stdgroth16.ValueOfProof[sw_bn254.G1Affine, sw_bn254.G2Affine](noSigProof)
 	if err != nil {
 		return nil, err
 	}
@@ -469,9 +472,7 @@ func GetExtraV0VerifierAssignment(headerGenerator func() (*types.Header, *types.
 		Current:        currentParameters,
 		RLPHashProof1:  rlpProof1,
 		RLPHashProof2:  rlpProof2,
-		RLPHashVk:      rlpKey,
-		NoSigHashProof: noSigProof,
-		NoSigHashVk:    noSigKey,
+		NoSigHashProof: noSigRlpProof,
 		NoSigHash:      [32]frontend.Variable(noSigHashVar),
 		PublicKeys:     publicKeys,
 		AddressIndices: indexVariables,

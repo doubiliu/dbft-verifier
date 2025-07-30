@@ -23,7 +23,8 @@ const (
 
 type BlockDistributeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Header        []byte                 `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"` // json
+	Header        []byte                 `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`                            // json
+	IsReliable    bool                   `protobuf:"varint,2,opt,name=is_reliable,json=isReliable,proto3" json:"is_reliable,omitempty"` // the first block, no parent proof, send to aggregator
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -63,6 +64,13 @@ func (x *BlockDistributeRequest) GetHeader() []byte {
 		return x.Header
 	}
 	return nil
+}
+
+func (x *BlockDistributeRequest) GetIsReliable() bool {
+	if x != nil {
+		return x.IsReliable
+	}
+	return false
 }
 
 type BlockDistributeResponse struct {
@@ -113,9 +121,11 @@ var File_distribute_proto protoreflect.FileDescriptor
 
 const file_distribute_proto_rawDesc = "" +
 	"\n" +
-	"\x10distribute.proto\x12\x05proto\"0\n" +
+	"\x10distribute.proto\x12\x05proto\"Q\n" +
 	"\x16BlockDistributeRequest\x12\x16\n" +
-	"\x06header\x18\x01 \x01(\fR\x06header\"3\n" +
+	"\x06header\x18\x01 \x01(\fR\x06header\x12\x1f\n" +
+	"\vis_reliable\x18\x02 \x01(\bR\n" +
+	"isReliable\"3\n" +
 	"\x17BlockDistributeResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess2a\n" +
 	"\x11DistributeService\x12L\n" +

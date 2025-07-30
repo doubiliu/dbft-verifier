@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/consensys/gnark/backend/groth16"
@@ -26,18 +27,32 @@ type AggregateServer struct {
 	feedback chan error
 }
 
-func (as *AggregateServer) StartAggregateServer() error {
-	// 监听指定端口
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", as.config.Local.Port))
+func NewAggregateServer(config config.ServiceConfig, feedback chan error) *AggregateServer {
+	return &AggregateServer{
+		config:   config,
+		output:   make(chan *aggregate.AggregateRequest, 100), // todo
+		feedback: feedback,
+	}
+}
+func (as *AggregateServer) StartAggregateServer(ctx context.Context) error {
+
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", as.config.Network.Aggregator.AggregatorPort))
 	if err != nil {
 		return err
 	}
 	server := grpc.NewServer(grpc.MaxSendMsgSize(as.config.MessageLimitSize), grpc.MaxRecvMsgSize(as.config.MessageLimitSize))
 	aggregate.RegisterAggregateServiceServer(server, as)
-
+	go func() {
+		<-ctx.Done()
+		fmt.Println("Shutting down Aggregate Server...")
+		server.Stop()
+	}()
 	return server.Serve(lis)
 }
 
+func (as *AggregateServer) AggregateChannel() chan *aggregate.AggregateRequest {
+	return as.output
+}
 func (as *AggregateServer) Commit(ctx context.Context, request *aggregate.AggregateRequest) (*aggregate.AggregateResponse, error) {
 	as.output <- request
 	return &aggregate.AggregateResponse{
@@ -48,6 +63,13 @@ func (as *AggregateServer) Commit(ctx context.Context, request *aggregate.Aggreg
 type AggregateClient struct {
 	config    config.ServiceConfig
 	ServerURL string
+}
+
+func NewAggregateClient(config config.ServiceConfig) *AggregateClient {
+	return &AggregateClient{
+		config:    config,
+		ServerURL: config.Network.Aggregator.AggregateString(),
+	}
 }
 
 func (ac *AggregateClient) CommitProof(block *types.Header, proof groth16.Proof, ce circuit.CircuitEnum) error {
@@ -63,9 +85,15 @@ func (ac *AggregateClient) CommitProof(block *types.Header, proof groth16.Proof,
 	if err != nil {
 		panic(err)
 	}
+	buf := bytes.NewBuffer([]byte{})
+	_, err = proof.(*groth16_bn254.Proof).WriteTo(buf)
+	if err != nil {
+		return err
+	}
+
 	request := &aggregate.AggregateRequest{
 		BlockHash: common.BytesToHash(crypto.Keccak256(edata)).Bytes(),
-		Proof:     proof.(*groth16_bn254.Proof).MarshalSolidity(), // todo read
+		Proof:     buf.Bytes(), // todo read
 		Circuit:   int32(ce),
 	}
 	response, err := client.Commit(ctx, request)

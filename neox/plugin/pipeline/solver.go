@@ -66,7 +66,6 @@ func (solver *PipelineSolver) solve(request SolveRequest, control chan struct{},
 	}
 	solution, err := solve(w, request.opts...)
 	//solution, err := groth16.Solve(solver.ccs, solver.pk, w, request.opts...)
-	fmt.Println("solve time: ", time.Since(start))
 	if err != nil {
 		// Non-blocking send for error
 		select {
@@ -75,6 +74,7 @@ func (solver *PipelineSolver) solve(request SolveRequest, control chan struct{},
 		}
 		return
 	}
+	fmt.Println("solve time: ", time.Since(start))
 
 	proveRequest := NewProveRequest(request, solution)
 	solver.output <- proveRequest

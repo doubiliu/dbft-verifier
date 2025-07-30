@@ -526,7 +526,10 @@ func initOuterCircuitPhase2(ctx *cli.Context) error {
 	var c frontend.Circuit
 	switch v {
 	case circuit.ExtraV0:
-		panic("not impl") // todo
+		c, err = circuit.GetExtraV0VerifierCircuit(func() (*types.Header, *types.Header, error) {
+			parent, current := circuit.HeaderTestData(circuit.ExtraV0)
+			return parent, current, nil
+		}, ccs1, ccs2, vk1, vk2)
 	case circuit.ExtraV1, circuit.ExtraV2:
 		c, err = circuit.GetExtraV1OrV2VerifierCircuit(v, func(extraVersion byte) (*types.Header, *types.Header, error) {
 			parent, current := circuit.HeaderTestData(extraVersion)

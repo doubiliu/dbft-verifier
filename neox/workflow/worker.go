@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
@@ -11,6 +12,7 @@ import (
 	"github.com/txhsl/neox-dbft-verifier/config"
 	"github.com/txhsl/neox-dbft-verifier/plugin/pipeline"
 	"github.com/txhsl/neox-dbft-verifier/service"
+	"golang.org/x/sync/errgroup"
 	"runtime"
 	"time"
 )
@@ -24,7 +26,6 @@ type Worker struct {
 	service.DistributeServer
 	service.AggregateClient
 	feedback chan error
-	tmp      chan pipeline.ProveResponse
 }
 
 func (n *Worker) Start() error {
@@ -34,24 +35,26 @@ func (n *Worker) Start() error {
 			fmt.Println("InnerCircuitProverNode Error: ", err)
 		}
 	}()
-	switch n.Mode {
-	case config.Pipeline:
-		err := n.runInPipeline()
-		if err != nil {
-			return err
-		}
-	case config.Serial:
-		err := n.runInSerial()
-		if err != nil {
-			return err
-		}
-	default:
-		panic("invalid node mode")
-	}
-	// start server
-	fmt.Println("Distribute Server start in", n.ServiceConfig.Local.String())
-	return n.StartDistributeServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
+	g, gCtx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		switch n.Mode {
+		case config.Pipeline:
+			return n.runInPipeline()
+		case config.Serial:
+			return n.runInSerial()
+		default:
+			return errors.New("invalid mode")
+		}
+	})
+	g.Go(func() error {
+		fmt.Println("Distribute Server start in", n.ServiceConfig.Local.String())
+		return n.StartDistributeServer(gCtx)
+	})
+	err := g.Wait()
+	return err
 }
 func (n *Worker) instanceConfig() (map[circuit.CircuitEnum]config.InstanceConfig, error) {
 	// each innerCircuitProverNode just need to get 2 circuits
@@ -70,12 +73,12 @@ func (n *Worker) instanceConfig() (map[circuit.CircuitEnum]config.InstanceConfig
 }
 
 func (n *Worker) runInSerial() error {
-	config, err := n.instanceConfig()
+	c, err := n.instanceConfig()
 	if err != nil {
 		return err
 	}
 	instances := make(map[circuit.CircuitEnum]pipeline.PackedCircuitInstance)
-	for ce, ic := range config {
+	for ce, ic := range c {
 		// load ccs, pk
 		instance, err := pipeline.LoadFromInstanceConfig(ic)
 		if err != nil {
@@ -84,8 +87,13 @@ func (n *Worker) runInSerial() error {
 		}
 		instances[ce] = instance
 	}
+	fmt.Println("instance load finish")
 	go func() {
 		for request := range n.DistributeChannel() {
+			if request.IsReliable {
+				fmt.Println("first block need not to be proved in worker, ignore it")
+				continue
+			}
 			header := new(types.Header)
 			err := header.UnmarshalJSON(request.Header)
 			if err != nil {
@@ -111,11 +119,14 @@ func (n *Worker) runInSerial() error {
 
 			proof, err := groth16.Prove(instance.Ccs, instance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
 			if err != nil {
+				fmt.Println("rlpHash prove error in block", header.Number.Uint64())
 				n.feedback <- err
+				continue
 			}
-			proveResponse := pipeline.NewProveResponse(&rlpHashTask, proof, circuit.RlpHash)
-			n.tmp <- proveResponse
-			//err = n.CommitProof(header, proof, circuit.RlpHash)
+			fmt.Printf("finish rlpHash proof, block height: %d\n", header.Number.Uint64())
+			//proveResponse := pipeline.NewProveResponse(&rlpHashTask, proof, circuit.RlpHash)
+			//n.tmp <- proveResponse
+			err = n.CommitProof(header, proof, circuit.RlpHash)
 			if err != nil {
 				n.feedback <- err
 				continue
@@ -141,11 +152,13 @@ func (n *Worker) runInSerial() error {
 			}
 			nextProof, err := groth16.Prove(nextInstance.Ccs, nextInstance.Pk, nextWitness, blockRequest.Option()...)
 			if err != nil {
+				fmt.Println("next prove error in block", header.Number.Uint64())
 				n.feedback <- err
+				continue
 			}
-			nextResponse := pipeline.NewProveResponse(&next, nextProof, next.ce)
-			n.tmp <- nextResponse
-			//err = n.CommitProof(header, nextProof, next.ce)
+			//nextResponse := pipeline.NewProveResponse(&next, nextProof, next.ce)
+			err = n.CommitProof(header, nextProof, next.ce)
+			fmt.Printf("finish next proof, block height: %d\n", header.Number.Uint64())
 
 		}
 	}()
@@ -164,6 +177,8 @@ func (n *Worker) runInPipeline() error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("instance load finish")
+
 	go func() {
 		for request := range n.DistributeChannel() {
 			header := new(types.Header)
@@ -220,8 +235,8 @@ func NewWorker(nodeConfig config.NodeConfig, serviceConfig config.ServiceConfig)
 	node.NodeConfig = nodeConfig
 	node.ServiceConfig = serviceConfig
 	node.feedback = make(chan error, 100) // todo
+	node.AggregateClient = *service.NewAggregateClient(serviceConfig)
 	node.DistributeServer = *service.NewDistributeServer(serviceConfig, node.feedback)
-	node.tasks = make(chan Task, 100)                 // todo
-	node.tmp = make(chan pipeline.ProveResponse, 100) // todo
+	node.tasks = make(chan Task, 100) // todo
 	return node
 }

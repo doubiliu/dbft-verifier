@@ -5,6 +5,7 @@ option go_package="/distribute";
 
 message BlockDistributeRequest{
   bytes header = 1; // json
+  bool is_reliable = 2; // the first block, no parent proof, send to aggregator
 }
 message BlockDistributeResponse{
   bool success = 1;

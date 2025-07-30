@@ -14,7 +14,7 @@ import (
 type BlockManager struct {
 	config   *config.ServiceConfig
 	client   *ethclient.Client
-	stopCh   chan struct{} // 用于发送停止信号的channel
+	stopCh   chan struct{}
 	feedback chan error
 	service.DistributeClient
 }
@@ -34,20 +34,46 @@ func (manager *BlockManager) Start() error {
 		return fmt.Errorf("failed to dial block source: %w", err)
 	}
 	manager.client = client
-	ticker := time.NewTicker(5 * time.Second)
-
-	// 3. 启动一个后台 goroutine 来处理定时任务
+	// first, we should select a block as the start, and then send to aggregator to compute rlpHash proof
+	ctx, cancel := context.WithTimeout(context.Background(), manager.config.Timeout)
+	defer cancel()
+	firstBlockNumber, err := manager.client.BlockNumber(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get block number: %w", err)
+	}
+	firstBlockHeader, err := manager.client.HeaderByNumber(ctx, big.NewInt(int64(firstBlockNumber)))
+	if err != nil {
+		return fmt.Errorf("failed to get first block header: %w", err)
+	}
+	time.Sleep(5 * time.Second) // todo
 	go func() {
-		defer ticker.Stop()
+		for {
+			err = manager.DistributeBlock(firstBlockHeader, true) // we simply send it to all nodes(workers and aggregator, workers will ignore it)
+			if err != nil {
+				manager.feedback <- err
+			} else {
+				break
+			}
+		}
+	}()
+	go func() {
 		defer manager.client.Close()
+		current := firstBlockNumber + 1
 		for {
 			select {
 			case <-manager.stopCh:
 				return
-			case <-ticker.C: // 定时器触发
-				err := manager.fetchLatestBlock()
-				if err != nil {
-					manager.feedback <- err
+			default:
+				for {
+					err := manager.fetchBlock(current)
+					if err == nil {
+						current++
+						time.Sleep(5 * time.Second) // todo
+						break
+					} else {
+						fmt.Printf("Block %d fetched error: %v, retry again\n", current, err)
+						time.Sleep(1 * time.Second) // todo
+					}
 				}
 			}
 		}
@@ -55,25 +81,22 @@ func (manager *BlockManager) Start() error {
 
 	return nil
 }
-func (manager *BlockManager) Feedback() chan error {
-	return manager.feedback
-}
 
-func (manager *BlockManager) fetchLatestBlock() error {
+func (manager *BlockManager) fetchBlock(blockNumber uint64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), manager.config.Timeout)
 	defer cancel()
 
-	number, err := manager.client.BlockNumber(ctx)
+	header, err := manager.client.HeaderByNumber(ctx, big.NewInt(int64(blockNumber)))
 	if err != nil {
 		return err
 	}
-	header, err := manager.client.HeaderByNumber(ctx, big.NewInt(int64(number)))
-	if err != nil {
-		return err
-	}
-	return manager.DistributeBlock(header)
+	return manager.DistributeBlock(header, false)
 
 }
 func (manager *BlockManager) Stop() {
 	close(manager.stopCh)
+}
+
+func (manager *BlockManager) Feedback() chan error {
+	return manager.feedback
 }

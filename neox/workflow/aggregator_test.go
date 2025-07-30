@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestWorkerWorkflow(t *testing.T) {
+func TestAggregatorWorkflow(t *testing.T) {
 	nodeConfig := config.NodeConfig{
 		Mode:     config.Serial,
 		NbMaxCPU: 64, // max
@@ -18,11 +18,11 @@ func TestWorkerWorkflow(t *testing.T) {
 			"/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.ccs",
 			"/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.pk",
 			"/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.vk",
-		),
-		ToG2HashInstance: pipeline.NewInstanceConfig(
-			"/root/neo/dbft-verifier/neox/circuit/to_g2_hash.ccs",
-			"/root/neo/dbft-verifier/neox/circuit/to_g2_hash.pk",
-			"/root/neo/dbft-verifier/neox/circuit/to_g2_hash.vk",
+		), // to prove first block, one-time
+		OuterAggInstance: pipeline.NewInstanceConfig(
+			"/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.ccs",
+			"/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.pk",
+			"/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.vk",
 		),
 		ExtraVersion: circuit.ExtraV1,
 	}
@@ -39,17 +39,21 @@ func TestWorkerWorkflow(t *testing.T) {
 		},
 		Local: config.BaseURL{
 			Address: "localhost",
-			Port:    8890,
+			Port:    8888, // to receive block
 		},
 		GrpcConfig: config.GrpcConfig{
 			MessageLimitSize: 1024 * 1024 * 1024,
 			Timeout:          5 * time.Second,
 		},
 	}
-	worker := NewWorker(nodeConfig, serviceConfig)
-	err := worker.Start()
+	aggregator := NewAggregator(nodeConfig, serviceConfig, true)
+	//go func() {
+	//	for res := range worker.tmp {
+	//		fmt.Println(fmt.Sprintf("Outside receive a %d response, time: %v", res.CircuitType, time.Since(res.Request.(*Task).startTime)))
+	//	}
+	//}()
+	err := aggregator.Start()
 	if err != nil {
 		panic(err)
 	}
-
 }

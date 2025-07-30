@@ -12,8 +12,9 @@ type Task struct {
 	ce circuit.CircuitEnum
 }
 
-func (task *Task) GetWitness() (witness.Witness, error) {
-	return task.Witness(task.ce)
+func (task *Task) GetWitness(params ...any) (witness.Witness, error) {
+	p := append([]any{task.ce}, params...)
+	return task.Witness(p...)
 }
 
 func (task *Task) CircuitEnum() circuit.CircuitEnum {

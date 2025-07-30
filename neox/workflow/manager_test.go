@@ -11,16 +11,17 @@ func TestManagerWorkflow(t *testing.T) {
 		ID: -1, // manager
 		Local: config.BaseURL{
 			Address: "localhost",
-			Port:    8888,
+			Port:    8887,
 		},
 		GrpcConfig: config.GrpcConfig{
 			MessageLimitSize: 1024 * 1024 * 1024,
 			Timeout:          5 * time.Second,
 		},
 		Network: config.NetworkConfig{
-			Aggregator: config.BaseURL{
-				Address: "localhost",
-				Port:    8889,
+			Aggregator: config.AggregateURL{
+				Address:        "localhost",
+				DistributePort: 8888,
+				AggregatorPort: 8889,
 			},
 			BlockSource: "https://neoxt4seed1.ngd.network/",
 			Workers: map[config.NodeID]config.BaseURL{
@@ -28,10 +29,6 @@ func TestManagerWorkflow(t *testing.T) {
 					Address: "localhost",
 					Port:    8890,
 				},
-				//1: {
-				//	Address: "localhost",
-				//	Port:    8891,
-				//},
 			},
 		},
 	}

@@ -6,7 +6,6 @@ import (
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/backend/witness"
-	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 	stdgroth16 "github.com/consensys/gnark/std/recursion/groth16"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -114,33 +113,43 @@ func (r *BlockRequest) Witness(params ...any) (witness.Witness, error) {
 		if len(params) < 2 {
 			return nil, errors.New("invalid number of params provided, expect at least 2")
 		}
-		parent := new(types.Header)
-		parentData, ok := params[1].([]byte)
+		parent, ok := params[1].(*types.Header)
 		if !ok {
-			return nil, errors.New("invalid parentData")
-		}
-		if err := parent.UnmarshalJSON(parentData); err != nil {
 			return nil, errors.New("invalid parentData")
 		}
 
 		switch extraVersion {
 		case circuit.ExtraV0:
-			// todo ExtraV1OrV2 has modified, ExtraV0 should be in a similar mode
 			// outer need an another param, parent
-			if len(params) < 4 {
-				return nil, errors.New("invalid number of params provided, expect at least 4")
+			if len(params) < 5 {
+				return nil, errors.New("invalid number of params provided, expect at least 5")
 			}
-			rlpHashCcs, ok := params[2].(constraint.ConstraintSystem)
-			if !ok {
-				return nil, errors.New("invalid rlpHashCcs")
+			parentRlpHashProof := func() (groth16.Proof, error) {
+				proof := params[2].(groth16.Proof)
+				if !ok {
+					return nil, errors.New("invalid parentRlpHashProof")
+				}
+				return proof, nil
 			}
-			noSigHashCcs, ok := params[3].(constraint.ConstraintSystem)
-			if !ok {
-				return nil, errors.New("invalid noSigHashCcs")
+			currentRlpHashProof := func() (groth16.Proof, error) {
+				proof := params[3].(groth16.Proof)
+				if !ok {
+					return nil, errors.New("invalid currentRlpHashProof")
+				}
+				return proof, nil
 			}
-			assignment, err := circuit.GetExtraV0VerifierCircuit(func() (*types.Header, *types.Header, error) {
+
+			noSigHashProof := func() (groth16.Proof, error) {
+				proof := params[4].(groth16.Proof)
+				if !ok {
+					return nil, errors.New("invalid toG2HashProof")
+				}
+				return proof, nil
+			}
+
+			assignment, err := circuit.GetExtraV0VerifierAssignment(func() (*types.Header, *types.Header, error) {
 				return current, parent, nil
-			}, rlpHashCcs, noSigHashCcs)
+			}, parentRlpHashProof, currentRlpHashProof, noSigHashProof)
 			if err != nil {
 				return nil, err
 			}
