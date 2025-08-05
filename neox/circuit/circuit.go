@@ -72,6 +72,7 @@ type HeaderRLPEncodeVerifyWrapper struct {
 func (c *HeaderRLPEncodeVerifyWrapper) Define(api frontend.API) error {
 	encode := NewHeaderEncoder(api)
 	header := c.Header.Decompressed(api)
+	api.Println(header.Bloom[:]...)
 	var toEncodeHeader HeaderParameters
 	var err error
 	if c.isNoSig {

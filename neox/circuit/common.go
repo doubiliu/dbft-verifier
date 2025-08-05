@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	bls12381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
 	"github.com/consensys/gnark/frontend"
 	"github.com/ethereum/go-ethereum/common"
@@ -197,12 +198,12 @@ func (h *CompressHeaderParameters) Decompressed(api frontend.API) HeaderParamete
 	header.TxHash = DecompressHash(api, h.TxHash)
 	header.ReceiptHash = DecompressHash(api, h.ReceiptHash)
 	// for bloom, we treat it as a hash, and then transform to bits
-	bloomHashBytes := DecompressBytes(api, h.Bloom) // 32-byte
-	bloom := make([]frontend.Variable, 0)
-	for i := 0; i < 32; i++ {
-		bloom = append(bloom, api.ToBinary(bloomHashBytes[i], 8)...)
-	}
-	header.Bloom = [256]frontend.Variable(bloom)
+	bloomHashBytes := DecompressBytes(api, h.Bloom) // 256-byte
+	//bloom := make([]frontend.Variable, 0)
+	//for i := 0; i < 32; i++ {
+	//	bloom = append(bloom, api.ToBinary(bloomHashBytes[i], 8)...)
+	//}
+	header.Bloom = [256]frontend.Variable(bloomHashBytes)
 	header.Difficulty = DecompressU64(api, h.Difficulty)
 	header.Number = DecompressU64(api, h.Number)
 	header.GasLimit = DecompressU64(api, h.GasLimit)
@@ -394,6 +395,9 @@ func GetCompressedHeaderParameters(header *types.Header) (CompressHeaderParamete
 			Length:    len(bytes),
 		}
 	}
+	fmt.Println("test bloom", header.Bloom)
+	fmt.Println(compressBytes(header.Bloom[:]))
+
 	coinBaseBytes := slices.Clone(header.Coinbase[:])
 
 	slices.Reverse(coinBaseBytes)

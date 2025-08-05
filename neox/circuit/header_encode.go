@@ -182,8 +182,6 @@ func (h *HeaderEncoder) encodeV1OrV2Header(header HeaderParameters) ([]frontend.
 
 		result := rlp.EncodeRule5_TwoBytes(r)
 
-		//fmt.Println(result)
-
 		kecczk256 := NewKeccak256(api)
 		computeHash, err := kecczk256.Compute(result)
 		if err != nil {
