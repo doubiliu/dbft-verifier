@@ -10,7 +10,7 @@ import (
 type Request interface {
 	Serialize() ([]byte, error) // todo
 	Deserialize(b []byte) error // todo
-	Witness(params ...any) (witness.Witness, error)
+	Witness() (witness.Witness, error)
 	Option() []backend.ProverOption
 	CircuitEnum() circuit.CircuitEnum
 }

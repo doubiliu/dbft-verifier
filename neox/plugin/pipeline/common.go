@@ -13,9 +13,9 @@ type PackedCircuitInstance struct {
 	Vk  groth16.VerifyingKey
 }
 type InstanceConfig struct {
-	ccsPath string
-	pkPath  string
-	vkPath  string
+	ccsPath string `json:"ccs_path"`
+	pkPath  string `json:"pk_path"`
+	vkPath  string `json:"vk_path"`
 }
 
 func NewInstanceConfig(ccsPath string, pkPath, vkPath string) InstanceConfig {

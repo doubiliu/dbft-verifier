@@ -22,8 +22,6 @@ import (
 	"github.com/txhsl/neox-dbft-verifier/utils"
 	"golang.org/x/sync/errgroup"
 	"time"
-
-	"runtime"
 )
 
 type PackedBlockHeader struct {
@@ -94,7 +92,7 @@ func (agg *Aggregator) loadOneTimeRlpInstance() error {
 }
 
 func (agg *Aggregator) Start() error {
-	runtime.GOMAXPROCS(agg.NbMaxCPU)
+	//runtime.GOMAXPROCS(agg.NbMaxCPU)
 	go func() {
 		for err := range agg.feedback {
 			fmt.Println("Aggregator Error: ", err)
@@ -176,8 +174,8 @@ func (agg *Aggregator) computeFirstBlockRlpHash(header *types.Header, blockHash 
 		startTime:   time.Now(),
 	}
 
-	rlpHashTask := Task{&blockRequest, circuit.RlpHash}
-	rlpWitness, err := rlpHashTask.GetWitness()
+	rlpHashTask := Task{&blockRequest, circuit.RlpHash, make([]any, 0)}
+	rlpWitness, err := rlpHashTask.Witness()
 	proof, err := groth16.Prove(agg.rlpHashOneTimeInstance.Ccs, agg.rlpHashOneTimeInstance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
 	if err != nil {
 		return err
@@ -271,9 +269,47 @@ func (agg *Aggregator) runInPipeline() error {
 		return err
 	}
 	fmt.Println("instance load finish")
+	scheduler.Start()
+
 	go func() {
 		for task := range agg.tasks {
+			header := task.blockHeader
+			// get proofs
+			// compute hash,
+			edata, err := circuit.EncodeHeader(header, false)
+			if err != nil {
+				agg.feedback <- err
+			}
+			blockHash := common.BytesToHash(crypto.Keccak256(edata)).Bytes()
+			fmt.Printf("Start prove a aggregate circuit, block hash: %v, block height: %d\n", blockHash, header.Number.Uint64())
+
+			currentPb, _ := agg.headers[hex.EncodeToString(blockHash)] // no need to check, since before the task is created, headers[hashString] has been checked
+			rlpHashProof, nextProof, err := currentPb.Proofs()
+			if err != nil {
+				agg.feedback <- err
+			}
+			// get parent RlpProof
+			parentPb, _ := agg.headers[hex.EncodeToString(header.ParentHash[:])] // no need to check, since before the task is created, headers[hashString] has been checked
+			parentRlpHashProof := parentPb.currentRlpHashProof
+			task.AddParams(parentPb.header, parentRlpHashProof, rlpHashProof, nextProof)
 			scheduler.Prove(&task)
+		}
+	}()
+	go func() {
+		for response := range scheduler.Response {
+			header := response.Request.(*Task).blockHeader
+			edata, err := circuit.EncodeHeader(header, false) // todo can this pre-compute or re-used?
+			if err != nil {
+				agg.feedback <- err
+			}
+			blockHash := common.BytesToHash(crypto.Keccak256(edata)).Bytes()
+
+			fmt.Printf("finish outer aggregate proof, block height: %d, block hash: %v, proof: %v\n", header.Number.Uint64(), blockHash, response.Proof)
+		}
+	}()
+	go func() {
+		for err := range scheduler.Errors() {
+			agg.feedback <- err
 		}
 	}()
 	return nil // todo
@@ -292,7 +328,7 @@ func (agg *Aggregator) runInSerial() error {
 
 			header := task.blockHeader
 			// get proofs
-			// compute hash, todo can this pre-compute or re-used?
+			// compute hash,
 			edata, err := circuit.EncodeHeader(header, false)
 			if err != nil {
 				agg.feedback <- err
@@ -308,7 +344,8 @@ func (agg *Aggregator) runInSerial() error {
 			// get parent RlpProof
 			parentPb, _ := agg.headers[hex.EncodeToString(header.ParentHash[:])] // no need to check, since before the task is created, headers[hashString] has been checked
 			parentRlpHashProof := parentPb.currentRlpHashProof
-			outerAggWitness, err := task.GetWitness(parentPb.header, parentRlpHashProof, rlpHashProof, nextProof)
+			task.AddParams(parentPb.header, parentRlpHashProof, rlpHashProof, nextProof)
+			outerAggWitness, err := task.Witness()
 			if err != nil {
 				agg.feedback <- err
 				continue

@@ -6,7 +6,6 @@ import (
 	"github.com/consensys/gnark/backend/groth16"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
 	"sync"
-	"time"
 )
 
 type PipelineProver struct {
@@ -45,18 +44,14 @@ func (prover *PipelineProver) Start(ctx context.Context, nbParallel int) {
 func (prover *PipelineProver) prove(request ProveRequest, control chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 	control <- struct{}{}
-	fmt.Println("Prover: start prove request")
 	defer func() {
 		<-control
-		fmt.Println("Prover: finish prove request")
 	}()
-	start := time.Now()
 	prove, ok := prover.proveFunc[request.CircuitEnum()]
 	if !ok {
 		prover.feedback <- fmt.Errorf("unsupported circuit type: %d", request.CircuitEnum())
 	}
 	proof, err := prove(request.Solution)
-	fmt.Println("proof time: ", time.Since(start))
 	if err != nil {
 		select {
 		case prover.feedback <- err:

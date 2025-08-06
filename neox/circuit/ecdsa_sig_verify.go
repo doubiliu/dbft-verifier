@@ -63,7 +63,6 @@ func (v *ECDSASigVerifier[Fp, Fr]) Verify(hash [32]frontend.Variable, signature 
 		yBytes[31-i] = api.FromBinary(yBits[index : index+8]...)
 	}
 	pubBytes := append(xBytes, yBytes...)
-	api.Println(pubBytes)
 	keccak256 := NewKeccak256(v.api)
 	//2. address = keccak256(pubBytes)[12:], len = 20
 	keyHashBytes, err := keccak256.Compute(pubBytes)

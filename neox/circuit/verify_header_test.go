@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/txhsl/neox-dbft-verifier/helper"
+	"os"
 
 	"golang.org/x/crypto/sha3"
 	"testing"
@@ -303,12 +304,12 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 		ToG2Hash[i] = hashBytes[i]
 	}
 	//slices.Reverse(ToG2Hash)
-	rlpHashVerifyCcs, err := helper.ReadCCS("/root/neo/dbft-verifier/neox/cmd/meta/v1/rlp_encode_hash_extra_v1_test.ccs")
+	rlpHashVerifyCcs, err := helper.ReadCCS("../cmd/meta/v1/rlp_encode_hash_extra_v1_test.ccs")
 	if err != nil {
 		panic(err)
 	}
 	var rlpHashVerifyVk groth16.VerifyingKey
-	rlpHashVerifyVk, err = helper.ReadVerifyingKey("/root/neo/dbft-verifier/neox/cmd/meta/v1/rlp_encode_hash_extra_v1_test.vk")
+	rlpHashVerifyVk, err = helper.ReadVerifyingKey("../cmd/meta/v1/rlp_encode_hash_extra_v1_test.vk")
 	if err != nil {
 		panic(err)
 	}
@@ -317,7 +318,7 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	//	panic(err)
 	//}
 	var rlpHashVerifyPk groth16.ProvingKey
-	rlpHashVerifyPk, err = helper.ReadProvingKey("/root/neo/dbft-verifier/neox/cmd/meta/v1/rlp_encode_hash_extra_v1_test.pk")
+	rlpHashVerifyPk, err = helper.ReadProvingKey("../cmd/meta/v1/rlp_encode_hash_extra_v1_test.pk")
 	if err != nil {
 		panic(err)
 	}
@@ -349,12 +350,12 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	toG2HashVerifyCcs, err := helper.ReadCCS("/root/neo/dbft-verifier/neox/cmd/meta/v1/to_g2_hash.ccs")
+	toG2HashVerifyCcs, err := helper.ReadCCS("../cmd/meta/v1/to_g2_hash.ccs")
 	if err != nil {
 		panic(err)
 	}
 	var toG2HashVerifyVk groth16.VerifyingKey
-	toG2HashVerifyVk, err = helper.ReadVerifyingKey("/root/neo/dbft-verifier/neox/cmd/meta/v1/to_g2_hash.vk")
+	toG2HashVerifyVk, err = helper.ReadVerifyingKey("../cmd/meta/v1/to_g2_hash.vk")
 	if err != nil {
 		panic(err)
 	}
@@ -363,7 +364,7 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	//	panic(err)
 	//}
 	var toG2HashVerifyPk groth16.ProvingKey
-	toG2HashVerifyPk, err = helper.ReadProvingKey("/root/neo/dbft-verifier/neox/cmd/meta/v1/to_g2_hash.pk")
+	toG2HashVerifyPk, err = helper.ReadProvingKey("../cmd/meta/v1/to_g2_hash.pk")
 	if err != nil {
 		panic(err)
 	}
@@ -433,7 +434,7 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	//if err != nil {
 	//	panic(err)
 	//}
-	ccs, err := helper.ReadCCS("/root/neo/dbft-verifier/neox/cmd/meta/v1/verify_header_extra_v1.ccs")
+	ccs, err := helper.ReadCCS("../cmd/meta/v1/verify_header_extra_v1.ccs")
 	//ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
 	if err != nil {
 		panic(err)
@@ -443,11 +444,11 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	//if err != nil {
 	//	panic(err)
 	//}
-	pk, err := helper.ReadProvingKey("/root/neo/dbft-verifier/neox/cmd/meta/v1/verify_header_extra_v1.pk")
+	pk, err := helper.ReadProvingKey("../cmd/meta/v1/verify_header_extra_v1.pk")
 	if err != nil {
 		panic(err)
 	}
-	vk, err := helper.ReadVerifyingKey("/root/neo/dbft-verifier/neox/cmd/meta/v1/verify_header_extra_v1.vk")
+	vk, err := helper.ReadVerifyingKey("../cmd/meta/v1/verify_header_extra_v1.vk")
 	if err != nil {
 		panic(err)
 	}
@@ -457,8 +458,17 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+	f, err := os.Create("header_verify_groth16.witness")
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println("Verify V1 Header Time: ", time.Since(start))
 	publicWitness, err := w.Public()
+
+	if err != nil {
+		panic(err)
+	}
+	_, err = publicWitness.WriteTo(f)
 	if err != nil {
 		panic(err)
 	}

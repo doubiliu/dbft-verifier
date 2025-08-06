@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	bls12381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
 	"github.com/consensys/gnark/frontend"
 	"github.com/ethereum/go-ethereum/common"
@@ -395,8 +394,6 @@ func GetCompressedHeaderParameters(header *types.Header) (CompressHeaderParamete
 			Length:    len(bytes),
 		}
 	}
-	fmt.Println("test bloom", header.Bloom)
-	fmt.Println(compressBytes(header.Bloom[:]))
 
 	coinBaseBytes := slices.Clone(header.Coinbase[:])
 

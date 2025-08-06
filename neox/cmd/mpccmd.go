@@ -42,7 +42,7 @@ var (
 	contractFileFlag = &cli.PathFlag{
 		Name:  "contract",
 		Usage: "The out file path of contract exportation",
-		Value: "Verifier.sol",
+		Value: "",
 	}
 	provingKeyFileFlag = &cli.PathFlag{
 		Name:  "pk",

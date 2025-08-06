@@ -10,19 +10,19 @@ import (
 
 func TestAggregatorWorkflow(t *testing.T) {
 	nodeConfig := config.NodeConfig{
-		Mode:     config.Serial,
-		NbMaxCPU: 64, // max
-		NbSolve:  -1,
-		NbProve:  -1,
+		Mode: config.Serial,
+		//NbMaxCPU: 64, // max
+		NbSolve: 1,
+		NbProve: 1,
 		RlpHashInstance: pipeline.NewInstanceConfig(
-			"/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.ccs",
-			"/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.pk",
-			"/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.vk",
+			"../circuit/rlp_encode_hash_extra_v1_test.ccs",
+			"../circuit/rlp_encode_hash_extra_v1_test.pk",
+			"../circuit/rlp_encode_hash_extra_v1_test.vk",
 		), // to prove first block, one-time
 		OuterAggInstance: pipeline.NewInstanceConfig(
-			"/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.ccs",
-			"/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.pk",
-			"/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.vk",
+			"../circuit/verify_header_extra_v1.ccs",
+			"../circuit/verify_header_extra_v1.pk",
+			"../circuit/verify_header_extra_v1.vk",
 		),
 		ExtraVersion: circuit.ExtraV1,
 	}

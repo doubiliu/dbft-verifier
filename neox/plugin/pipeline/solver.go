@@ -7,7 +7,6 @@ import (
 	"github.com/consensys/gnark/backend/witness"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
 	"sync"
-	"time"
 )
 
 // PipelineSolver processes "witness generation" and commitment
@@ -49,13 +48,10 @@ func (solver *PipelineSolver) solve(request SolveRequest, control chan struct{},
 	defer wg.Done()
 
 	control <- struct{}{} // Acquire a semaphore slot
-	fmt.Println("Solver: start solve request")
 	defer func() {
 		<-control // Release the semaphore slot
-		fmt.Println("Solver: finish solve request")
 	}()
-	start := time.Now()
-	w, err := request.Witness(request.CircuitEnum())
+	w, err := request.Witness()
 	if err != nil {
 		solver.feedback <- err
 		return
@@ -74,7 +70,6 @@ func (solver *PipelineSolver) solve(request SolveRequest, control chan struct{},
 		}
 		return
 	}
-	fmt.Println("solve time: ", time.Since(start))
 
 	proveRequest := NewProveRequest(request, solution)
 	solver.output <- proveRequest

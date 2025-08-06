@@ -13,7 +13,6 @@ import (
 	"github.com/txhsl/neox-dbft-verifier/plugin/pipeline"
 	"github.com/txhsl/neox-dbft-verifier/service"
 	"golang.org/x/sync/errgroup"
-	"runtime"
 	"time"
 )
 
@@ -29,7 +28,7 @@ type Worker struct {
 }
 
 func (n *Worker) Start() error {
-	runtime.GOMAXPROCS(n.NbMaxCPU)
+	//runtime.GOMAXPROCS(n.NbMaxCPU)
 	go func() {
 		for err := range n.feedback {
 			fmt.Println("InnerCircuitProverNode Error: ", err)
@@ -56,6 +55,43 @@ func (n *Worker) Start() error {
 	err := g.Wait()
 	return err
 }
+func (n *Worker) rlpInstance() (pipeline.PackedCircuitInstance, error) {
+	return pipeline.LoadFromInstanceConfig(n.RlpHashInstance)
+}
+
+func (n *Worker) nextInstance() (pipeline.PackedCircuitInstance, error) {
+	switch n.ExtraVersion {
+	case circuit.ExtraV0:
+
+		return pipeline.LoadFromInstanceConfig(n.NoSigRlpInstance)
+	case circuit.ExtraV1, circuit.ExtraV2:
+		return pipeline.LoadFromInstanceConfig(n.ToG2HashInstance)
+	default:
+		return pipeline.PackedCircuitInstance{}, errors.New("invalid version")
+	}
+}
+
+func (n *Worker) rlpInstanceConfig() (map[circuit.CircuitEnum]config.InstanceConfig, error) {
+	return map[circuit.CircuitEnum]config.InstanceConfig{
+		circuit.RlpHash: n.RlpHashInstance,
+	}, nil
+}
+
+func (n *Worker) nextInstanceConfig() (map[circuit.CircuitEnum]config.InstanceConfig, error) {
+	switch n.ExtraVersion {
+	case circuit.ExtraV0:
+		return map[circuit.CircuitEnum]config.InstanceConfig{
+			circuit.NoSigRlp: n.NoSigRlpInstance,
+		}, nil
+	case circuit.ExtraV1, circuit.ExtraV2:
+		return map[circuit.CircuitEnum]config.InstanceConfig{
+			circuit.ToG2Hash: n.ToG2HashInstance,
+		}, nil
+	default:
+		return nil, errors.New("invalid node version")
+	}
+
+}
 func (n *Worker) instanceConfig() (map[circuit.CircuitEnum]config.InstanceConfig, error) {
 	// each innerCircuitProverNode just need to get 2 circuits
 	// rlpHash
@@ -73,19 +109,14 @@ func (n *Worker) instanceConfig() (map[circuit.CircuitEnum]config.InstanceConfig
 }
 
 func (n *Worker) runInSerial() error {
-	c, err := n.instanceConfig()
+	//c, err := n.instanceConfig()
+	rlpInstance, err := n.rlpInstance()
 	if err != nil {
 		return err
 	}
-	instances := make(map[circuit.CircuitEnum]pipeline.PackedCircuitInstance)
-	for ce, ic := range c {
-		// load ccs, pk
-		instance, err := pipeline.LoadFromInstanceConfig(ic)
-		if err != nil {
-			n.feedback <- err
-			continue
-		}
-		instances[ce] = instance
+	nextInstance, err := n.nextInstance()
+	if err != nil {
+		return err
 	}
 	fmt.Println("instance load finish")
 	go func() {
@@ -105,19 +136,14 @@ func (n *Worker) runInSerial() error {
 				isInner:     true,
 				startTime:   time.Now(),
 			}
-			rlpHashTask := Task{&blockRequest, circuit.RlpHash}
-			rlpWitness, err := rlpHashTask.GetWitness()
+			rlpHashTask := Task{&blockRequest, circuit.RlpHash, make([]any, 0)}
+			rlpWitness, err := rlpHashTask.Witness()
 			if err != nil {
 				n.feedback <- err
 				continue
 			}
-			instance, ok := instances[circuit.RlpHash]
-			if !ok {
-				n.feedback <- fmt.Errorf("invalid instance for circuitEnum %d", rlpHashTask.ce)
-				continue
-			}
 
-			proof, err := groth16.Prove(instance.Ccs, instance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
+			proof, err := groth16.Prove(rlpInstance.Ccs, rlpInstance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
 			if err != nil {
 				fmt.Println("rlpHash prove error in block", header.Number.Uint64())
 				n.feedback <- err
@@ -140,12 +166,7 @@ func (n *Worker) runInSerial() error {
 			if isFinish {
 				continue
 			}
-			nextInstance, ok := instances[next.ce]
-			if !ok {
-				n.feedback <- fmt.Errorf("invalid instance for circuitEnum %d", next.ce)
-				continue
-			}
-			nextWitness, err := next.GetWitness()
+			nextWitness, err := next.Witness()
 			if err != nil {
 				n.feedback <- err
 				continue
@@ -169,11 +190,17 @@ func (n *Worker) runInPipeline() error {
 	// node in Pipeline mode starts a pipelineScheduler to prove proofs in pipeline
 	// todo pendingSize
 	fmt.Println("node starts in pipeline mode")
-	config, err := n.instanceConfig()
+	rlpInstance, err := n.rlpInstance()
 	if err != nil {
 		return err
 	}
-	scheduler, err := pipeline.NewPipelineScheduler(n.NbSolve, n.NbProve, 100, config)
+	nextInstanceConfig, err := n.nextInstanceConfig()
+	if err != nil {
+		return err
+	}
+	// rlp is too fast and has a high-cpu-usage solve and prove, we serially run it
+	//rlpScheduler, err := pipeline.NewPipelineScheduler(n.NbSolve, n.NbProve, 100, rlpInstanceConfig)
+	nextScheduler, err := pipeline.NewPipelineScheduler(n.NbSolve, n.NbProve, 100, nextInstanceConfig)
 	if err != nil {
 		return err
 	}
@@ -181,18 +208,23 @@ func (n *Worker) runInPipeline() error {
 
 	go func() {
 		for request := range n.DistributeChannel() {
+			if request.IsReliable {
+				fmt.Println("first block need not to be proved in worker, ignore it")
+				continue
+			}
 			header := new(types.Header)
 			err := header.UnmarshalJSON(request.Header)
 			if err != nil {
 				n.feedback <- err
 			}
+			fmt.Printf("receive block distribute request, block height: %d\n", header.Number.Uint64())
 			blockRequest := BlockRequest{
 				blockHeader: header,
 				isInner:     true,
 				startTime:   time.Now(),
 			}
-			task := Task{&blockRequest, circuit.RlpHash}
-			n.tasks <- task
+			task := Task{&blockRequest, circuit.RlpHash, make([]any, 0)}
+			n.tasks <- task                    // tasks is used for serial running
 			next, isFinish, err := task.Next() // can pipeline
 			if err != nil {
 				n.feedback <- err
@@ -201,29 +233,71 @@ func (n *Worker) runInPipeline() error {
 			if isFinish {
 				continue
 			}
-			n.tasks <- next
+			nextScheduler.Prove(&next)
 		}
 	}()
-	scheduler.Start()
+	//rlpScheduler.Start()
+	nextScheduler.Start()
+	//go func() {
+	//	for response := range rlpScheduler.Response {
+	//		fmt.Printf("finish prove block %d, circuit: %d\n", response.Request.(*Task).blockHeader.Number, response.CircuitType)
+	//		err = n.CommitProof(response.Request.(*Task).blockHeader, response.Proof, response.CircuitEnum())
+	//		if err != nil {
+	//			n.feedback <- err
+	//		}
+	//	}
+	//}()
 	go func() {
-		for response := range scheduler.Response {
-			fmt.Println("finish prove")
+		for response := range nextScheduler.Response {
+			fmt.Printf("finish next proof, circuit: %d, block height: %d\n", response.CircuitType, response.Request.(*Task).blockHeader.Number.Uint64())
 			err = n.CommitProof(response.Request.(*Task).blockHeader, response.Proof, response.CircuitEnum())
 			if err != nil {
 				n.feedback <- err
 			}
-			//n.connection.output <- &response
 		}
 	}()
+	//go func() {
+	//	for err := range rlpScheduler.Errors() {
+	//		n.feedback <- err
+	//	}
+	//}()
 	go func() {
-		for err := range scheduler.Errors() {
+		for err := range nextScheduler.Errors() {
 			n.feedback <- err
 		}
 	}()
+	// rlp(serial)
 	go func() {
 		for task := range n.tasks {
-			fmt.Println("receive request, add to solve queue")
-			scheduler.Prove(&task)
+			//if task.CircuitEnum() == circuit.RlpHash {
+			//	rlpScheduler.Prove(&task)
+			//} else {
+			//	nextScheduler.Prove(&task)
+			//}
+			if task.CircuitEnum() != circuit.RlpHash {
+				n.feedback <- fmt.Errorf("invalid circuit type in rlp tasks: %v", task.CircuitEnum())
+				continue
+			}
+			rlpWitness, err := task.Witness()
+			if err != nil {
+				n.feedback <- err
+				continue
+			}
+
+			proof, err := groth16.Prove(rlpInstance.Ccs, rlpInstance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
+			if err != nil {
+				fmt.Println("rlpHash prove error in block", task.blockHeader.Number.Uint64())
+				n.feedback <- err
+				continue
+			}
+			fmt.Printf("finish rlpHash proof, block height: %d\n", task.blockHeader.Number.Uint64())
+			//proveResponse := pipeline.NewProveResponse(&rlpHashTask, proof, circuit.RlpHash)
+			//n.tmp <- proveResponse
+			err = n.CommitProof(task.blockHeader, proof, circuit.RlpHash)
+			if err != nil {
+				n.feedback <- err
+				continue
+			}
 		}
 	}()
 	return nil

@@ -64,7 +64,7 @@ func (r *BlockRequest) ExtraVersion() (byte, error) {
 	return utils.GetBlockHeaderExtraVersion(r.blockHeader), nil
 }
 
-func (r *BlockRequest) Witness(params ...any) (witness.Witness, error) {
+func (r *BlockRequest) GetWitness(params ...any) (witness.Witness, error) {
 	if len(params) == 0 {
 		return nil, errors.New("invalid number of params provided, expect a circuitEnum at least")
 	}

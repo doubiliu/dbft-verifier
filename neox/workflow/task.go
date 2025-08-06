@@ -9,14 +9,18 @@ import (
 // Task is a pending-request's actual processing
 type Task struct {
 	*BlockRequest
-	ce circuit.CircuitEnum
+	ce     circuit.CircuitEnum
+	params []any
 }
 
-func (task *Task) GetWitness(params ...any) (witness.Witness, error) {
-	p := append([]any{task.ce}, params...)
-	return task.Witness(p...)
+func (task *Task) Witness() (witness.Witness, error) {
+	p := append([]any{task.ce}, task.params...)
+	return task.GetWitness(p...)
 }
 
+func (task *Task) AddParams(p ...any) {
+	task.params = append(task.params, p...)
+}
 func (task *Task) CircuitEnum() circuit.CircuitEnum {
 	return task.ce
 }
@@ -29,7 +33,7 @@ func (task *Task) Next() (Task, bool, error) {
 	switch extraVersion {
 	case circuit.ExtraV0:
 		if task.ce == circuit.RlpHash {
-			return Task{task.BlockRequest, circuit.NoSigRlp}, false, nil
+			return Task{task.BlockRequest, circuit.NoSigRlp, make([]any, 0)}, false, nil
 		} else if task.ce == circuit.NoSigRlp || task.ce == circuit.OuterAgg {
 			return Task{}, true, nil
 		} else {
@@ -37,7 +41,7 @@ func (task *Task) Next() (Task, bool, error) {
 		}
 	case circuit.ExtraV1, circuit.ExtraV2:
 		if task.ce == circuit.RlpHash {
-			return Task{task.BlockRequest, circuit.ToG2Hash}, false, nil
+			return Task{task.BlockRequest, circuit.ToG2Hash, make([]any, 0)}, false, nil
 		} else if task.ce == circuit.ToG2Hash || task.ce == circuit.OuterAgg {
 			return Task{}, true, nil
 		} else {

@@ -108,7 +108,8 @@ func (hv *HeaderVerifier[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl]) VerifyV0(
 		api.AssertIsEqual(len(sigs[i]), 65)
 		signature := [65]frontend.Variable(sigs[i])
 		addressInt := selector.Mux(api, addressIndices[i], addressInts...) // addressInt[index]
-		address := api.ToBinary(addressInt, 160)                           // len(20) * 8
+
+		address := api.ToBinary(addressInt, 160) // len(20) * 8
 		addressBytes := make([]frontend.Variable, 20)
 		for j := 0; j < 20; j++ {
 			addressBytes[j] = api.FromBinary(address[j*8 : (j+1)*8]...)
