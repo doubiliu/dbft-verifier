@@ -78,11 +78,11 @@ func NewPipelineScheduler(nbSolve, nbProve, pendingSize int, instanceConfig map[
 	proveFuncs := make(map[circuit.CircuitEnum]func(solution any) (groth16.Proof, error))
 	for ce, config := range instanceConfig {
 		// load ccs, pk, vk
-		ccs, err := helper.ReadCCS(config.ccsPath)
+		ccs, err := helper.ReadCCS(config.CcsPath)
 		if err != nil {
 			return nil, err
 		}
-		pk, err := helper.ReadProvingKey(config.pkPath)
+		pk, err := helper.ReadProvingKey(config.PkPath)
 		if err != nil {
 			return nil, err
 		}

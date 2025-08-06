@@ -13,29 +13,29 @@ type PackedCircuitInstance struct {
 	Vk  groth16.VerifyingKey
 }
 type InstanceConfig struct {
-	ccsPath string `json:"ccs_path"`
-	pkPath  string `json:"pk_path"`
-	vkPath  string `json:"vk_path"`
+	CcsPath string `json:"ccs_path"`
+	PkPath  string `json:"pk_path"`
+	VkPath  string `json:"vk_path"`
 }
 
 func NewInstanceConfig(ccsPath string, pkPath, vkPath string) InstanceConfig {
 	return InstanceConfig{
-		ccsPath: ccsPath,
-		pkPath:  pkPath,
-		vkPath:  vkPath,
+		CcsPath: ccsPath,
+		PkPath:  pkPath,
+		VkPath:  vkPath,
 	}
 }
 
 func LoadFromInstanceConfig(config InstanceConfig) (PackedCircuitInstance, error) {
-	ccs, err := helper.ReadCCS(config.ccsPath)
+	ccs, err := helper.ReadCCS(config.CcsPath)
 	if err != nil {
 		return PackedCircuitInstance{}, err
 	}
-	pk, err := helper.ReadProvingKey(config.pkPath)
+	pk, err := helper.ReadProvingKey(config.PkPath)
 	if err != nil {
 		return PackedCircuitInstance{}, err
 	}
-	vk, err := helper.ReadVerifyingKey(config.vkPath)
+	vk, err := helper.ReadVerifyingKey(config.VkPath)
 	if err != nil {
 		return PackedCircuitInstance{}, err
 	}

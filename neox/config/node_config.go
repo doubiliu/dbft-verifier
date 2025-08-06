@@ -1,7 +1,10 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/txhsl/neox-dbft-verifier/plugin/pipeline"
+	"os"
 )
 
 type NodeMode = int
@@ -14,13 +17,25 @@ const (
 
 // NodeConfig gives a configuration of node
 type NodeConfig struct {
-	Mode             NodeMode
-	NbMaxCPU         int // cpu number
-	NbSolve          int // solver number
-	NbProve          int // prover number
-	RlpHashInstance  InstanceConfig
-	ToG2HashInstance InstanceConfig
-	NoSigRlpInstance InstanceConfig
-	OuterAggInstance InstanceConfig
-	ExtraVersion     byte
+	Mode NodeMode `json:"mode"`
+	//NbMaxCPU         int // cpu number
+	NbSolve          int            `json:"nb_solve"` // solver number todo we fix it 1
+	NbProve          int            `json:"nb_prove"` // prover number todo we fix it 1
+	RlpHashInstance  InstanceConfig `json:"rlp_hash_instance"`
+	ToG2HashInstance InstanceConfig `json:"to_g2_hash_instance"`
+	NoSigRlpInstance InstanceConfig `json:"no_sig_rlp_instance"`
+	OuterAggInstance InstanceConfig `json:"outer_agg_instance"`
+	ExtraVersion     byte           `json:"extra_version"`
+}
+
+func (config *NodeConfig) FromJson(jsonPath string) error {
+	fileContent, err := os.ReadFile(jsonPath)
+	if err != nil {
+		return fmt.Errorf("error reading configuration file at '%s': %w", jsonPath, err)
+	}
+	err = json.Unmarshal(fileContent, config)
+	if err != nil {
+		return fmt.Errorf("error parsing JSON from '%s': %w", jsonPath, err)
+	}
+	return nil
 }

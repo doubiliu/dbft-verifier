@@ -12,5 +12,10 @@ func TestNodeConfig(t *testing.T) {
 	c := NodeConfig{}
 	err := c.FromJson(testJsonPath)
 	assert.NoError(err)
-	fmt.Println(c)
+	fmt.Println(c.NbSolve, c.NbProve)
+	fmt.Println(c.Mode, c.ExtraVersion)
+	fmt.Println(c.RlpHashInstance)
+	fmt.Println(c.ToG2HashInstance)
+	fmt.Println(c.NoSigRlpInstance)
+	fmt.Println(c.OuterAggInstance)
 }
