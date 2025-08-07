@@ -1,0 +1,19 @@
+aggregators:
+- id: 0
+  address: 172.23.166.111
+  distribute_port: 9000
+  aggregate_port: 9100
+- id: 1
+  address: 172.23.166.111
+  distribute_port: 9001
+  aggregate_port: 9101
+workers:
+- id: 2
+  address: 172.23.166.111
+  port: 10000
+- id: 3
+  address: 172.23.166.111
+  port: 10001
+- id: 4
+  address: 172.23.166.111
+  port: 10002

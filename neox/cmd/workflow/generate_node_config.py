@@ -2,6 +2,7 @@ import argparse
 import json
 import sys
 import yaml
+# use instance.yml to generate node_config.json for given ip
 def generate_node_config(args):
     """
     Generates node_config.json based on a master paths file and command-line arguments.

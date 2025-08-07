@@ -1,0 +1,24 @@
+{
+  "mode": 1,
+  "extra_version": 1,
+  "rlp_hash_instance": {
+    "ccs_path": "/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.ccs",
+    "pk_path": "/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.pk",
+    "vk_path": "/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.vk"
+  },
+  "to_g2_hash_instance": {
+    "ccs_path": "/root/neo/dbft-verifier/neox/circuit/to_g2_hash.ccs",
+    "pk_path": "/root/neo/dbft-verifier/neox/circuit/to_g2_hash.pk",
+    "vk_path": "/root/neo/dbft-verifier/neox/circuit/to_g2_hash.vk"
+  },
+  "no_sig_rlp_instance": {
+    "ccs_path": "",
+    "pk_path": "",
+    "vk_path": ""
+  },
+  "outer_agg_instance": {
+    "ccs_path": "/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.ccs",
+    "pk_path": "/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.pk",
+    "vk_path": "/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.vk"
+  }
+}

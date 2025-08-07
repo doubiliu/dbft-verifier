@@ -1,5 +1,5 @@
 #This file defines the absolute path of the circuit files required for each node (identified by IP) on the remote machine.
-#The script will search and use these paths based on the IP address.
+# Need to manually provide!!!
 172.23.166.111:
   rlp_hash_instance:
     ccs_path: "/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.ccs"

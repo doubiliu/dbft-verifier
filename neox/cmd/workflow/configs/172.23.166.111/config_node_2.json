@@ -1,0 +1,68 @@
+{
+    "ServiceConfig": {
+        "ID": 2,
+        "Network": {
+            "agg_severs": {
+                "0": {
+                    "address": "172.23.166.111",
+                    "distribute_port": 9000,
+                    "aggregate_port": 9100
+                },
+                "1": {
+                    "address": "172.23.166.111",
+                    "distribute_port": 9001,
+                    "aggregate_port": 9101
+                }
+            },
+            "node_severs": {
+                "2": {
+                    "address": "172.23.166.111",
+                    "port": 10000
+                },
+                "3": {
+                    "address": "172.23.166.111",
+                    "port": 10001
+                },
+                "4": {
+                    "address": "172.23.166.111",
+                    "port": 10002
+                }
+            },
+            "block_source": "https://neoxt4seed1.ngd.network/"
+        },
+        "Local": {
+            "address": "172.23.166.111",
+            "port": 10000
+        },
+        "GrpcConfig": {
+            "MessageLimitSize": 104857600,
+            "Timeout": "5s"
+        }
+    },
+    "NodeConfig": {
+        "mode": 0,
+        "extra_version": 1,
+        "nb_solve": 1,
+        "nb_prove": 1,
+        "rlp_hash_instance": {
+            "ccs_path": "/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.ccs",
+            "pk_path": "/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.pk",
+            "vk_path": "/root/neo/dbft-verifier/neox/circuit/rlp_encode_hash_extra_v1_test.vk"
+        },
+        "to_g2_hash_instance": {
+            "ccs_path": "/root/neo/dbft-verifier/neox/circuit/to_g2_hash.ccs",
+            "pk_path": "/root/neo/dbft-verifier/neox/circuit/to_g2_hash.pk",
+            "vk_path": "/root/neo/dbft-verifier/neox/circuit/to_g2_hash.vk"
+        },
+        "no_sig_rlp_instance": {
+            "ccs_path": "",
+            "pk_path": "",
+            "vk_path": ""
+        },
+        "outer_agg_instance": {
+            "ccs_path": "/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.ccs",
+            "pk_path": "/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.pk",
+            "vk_path": "/root/neo/dbft-verifier/neox/circuit/verify_header_extra_v1.vk"
+        }
+    }
+}
