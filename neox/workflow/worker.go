@@ -19,8 +19,7 @@ import (
 // Worker impls a workflow of generate inner circuit proofs
 // each node only proves one certain circuit
 type Worker struct {
-	config.NodeConfig
-	config.ServiceConfig
+	config.CommonConfig
 	tasks chan Task
 	service.DistributeServer
 	service.AggregateClient
@@ -29,6 +28,9 @@ type Worker struct {
 
 func (n *Worker) Start() error {
 	//runtime.GOMAXPROCS(n.NbMaxCPU)
+	if n.Job != config.Worker {
+		return errors.New("not a worker")
+	}
 	go func() {
 		for err := range n.feedback {
 			fmt.Println("InnerCircuitProverNode Error: ", err)
@@ -49,7 +51,7 @@ func (n *Worker) Start() error {
 		}
 	})
 	g.Go(func() error {
-		fmt.Println("Distribute Server start in", n.ServiceConfig.Local.String())
+		fmt.Println("Distribute Server start in", n.ServiceConfig.Local.DistributeString())
 		return n.StartDistributeServer(gCtx)
 	})
 	err := g.Wait()
@@ -303,8 +305,19 @@ func (n *Worker) runInPipeline() error {
 	return nil
 }
 
+func (n *Worker) FromJson(jsonPath string) error {
+	var err error
+	n.CommonConfig, err = config.LoadConfigFromJson(jsonPath)
+	if err != nil {
+		return err
+	}
+	n.feedback = make(chan error, 100) // todo
+	n.AggregateClient = *service.NewAggregateClient(n.ServiceConfig)
+	n.DistributeServer = *service.NewDistributeServer(n.ServiceConfig, n.feedback)
+	n.tasks = make(chan Task, 100) // todo
+	return nil
+}
 func NewWorker(nodeConfig config.NodeConfig, serviceConfig config.ServiceConfig) Worker {
-	// todo connection
 	node := Worker{}
 	node.NodeConfig = nodeConfig
 	node.ServiceConfig = serviceConfig

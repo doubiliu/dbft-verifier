@@ -35,7 +35,7 @@ func (manager *BlockManager) Start() error {
 	}
 	manager.client = client
 	// first, we should select a block as the start, and then send to aggregator to compute rlpHash proof
-	ctx, cancel := context.WithTimeout(context.Background(), manager.config.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), config.CONNECT_TIMEOUT)
 	defer cancel()
 	firstBlockNumber, err := manager.client.BlockNumber(ctx)
 	if err != nil {
@@ -83,7 +83,7 @@ func (manager *BlockManager) Start() error {
 }
 
 func (manager *BlockManager) fetchBlock(blockNumber uint64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), manager.config.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), config.CONNECT_TIMEOUT)
 	defer cancel()
 
 	header, err := manager.client.HeaderByNumber(ctx, big.NewInt(int64(blockNumber)))

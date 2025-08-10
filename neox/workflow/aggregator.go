@@ -70,8 +70,7 @@ func NewPackedBlockHeader(header *types.Header) *PackedBlockHeader {
 }
 
 type Aggregator struct {
-	config.NodeConfig
-	config.ServiceConfig
+	config.CommonConfig
 	tasks chan Task
 	service.AggregateServer
 	service.DistributeServer
@@ -93,6 +92,10 @@ func (agg *Aggregator) loadOneTimeRlpInstance() error {
 
 func (agg *Aggregator) Start() error {
 	//runtime.GOMAXPROCS(agg.NbMaxCPU)
+	if agg.Job != config.Aggregator {
+		fmt.Println(agg.Job)
+		return errors.New("not a aggregator")
+	}
 	go func() {
 		for err := range agg.feedback {
 			fmt.Println("Aggregator Error: ", err)
@@ -122,12 +125,12 @@ func (agg *Aggregator) Start() error {
 	})
 
 	g.Go(func() error {
-		fmt.Println("Aggregate Server starting in", agg.ServiceConfig.Network.Aggregator.AggregateString())
+		fmt.Println("Aggregate Server starting in", agg.ServiceConfig.Local.AggregateString())
 		return agg.StartAggregateServer(gCtx)
 	})
 
 	g.Go(func() error {
-		fmt.Println("Distribute Server starting in", agg.ServiceConfig.Network.Aggregator.DistributeString())
+		fmt.Println("Distribute Server starting in", agg.ServiceConfig.Local.DistributeString())
 		return agg.StartDistributeServer(gCtx)
 	})
 
@@ -361,6 +364,23 @@ func (agg *Aggregator) runInSerial() error {
 	}()
 	return nil
 }
+
+func (agg *Aggregator) FromJson(jsonPath string, isNoFork bool) error {
+	var err error
+	agg.CommonConfig, err = config.LoadConfigFromJson(jsonPath)
+	if err != nil {
+		return err
+	}
+	fmt.Println(agg.CommonConfig.Network)
+	agg.feedback = make(chan error, 100) // todo
+	agg.DistributeServer = *service.NewDistributeServer(agg.ServiceConfig, agg.feedback)
+	agg.AggregateServer = *service.NewAggregateServer(agg.ServiceConfig, agg.feedback)
+	agg.tasks = make(chan Task, 100) // todo
+	agg.headers = make(map[string]*PackedBlockHeader)
+	agg.isNoFork = isNoFork
+	return nil
+}
+
 func NewAggregator(nodeConfig config.NodeConfig, serviceConfig config.ServiceConfig, isNoFork bool) Aggregator {
 	// todo connection
 	node := Aggregator{}

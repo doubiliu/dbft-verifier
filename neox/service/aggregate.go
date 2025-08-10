@@ -35,12 +35,11 @@ func NewAggregateServer(config config.ServiceConfig, feedback chan error) *Aggre
 	}
 }
 func (as *AggregateServer) StartAggregateServer(ctx context.Context) error {
-
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", as.config.Network.Aggregator.AggregatorPort))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", as.config.Local.AggregatorPort))
 	if err != nil {
 		return err
 	}
-	server := grpc.NewServer(grpc.MaxSendMsgSize(as.config.MessageLimitSize), grpc.MaxRecvMsgSize(as.config.MessageLimitSize))
+	server := grpc.NewServer(grpc.MaxSendMsgSize(config.MESSAGE_LIMIT_SIZE), grpc.MaxRecvMsgSize(config.MESSAGE_LIMIT_SIZE))
 	aggregate.RegisterAggregateServiceServer(server, as)
 	go func() {
 		<-ctx.Done()
@@ -68,7 +67,7 @@ type AggregateClient struct {
 func NewAggregateClient(config config.ServiceConfig) *AggregateClient {
 	return &AggregateClient{
 		config:    config,
-		ServerURL: config.Network.Aggregator.AggregateString(),
+		ServerURL: config.Local.AggregateString(),
 	}
 }
 
@@ -77,7 +76,7 @@ func (ac *AggregateClient) CommitProof(block *types.Header, proof groth16.Proof,
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), ac.config.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), config.CONNECT_TIMEOUT)
 	defer cancel()
 	client := aggregate.NewAggregateServiceClient(conn)
 	// we compute rlpHash here in avoid to modify the params

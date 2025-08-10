@@ -28,11 +28,11 @@ func NewDistributeServer(config config.ServiceConfig, feedback chan error) *Dist
 }
 
 func (ds *DistributeServer) StartDistributeServer(ctx context.Context) error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", ds.config.Local.Port))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", ds.config.Local.DistributePort))
 	if err != nil {
 		return err
 	}
-	server := grpc.NewServer(grpc.MaxSendMsgSize(ds.config.MessageLimitSize), grpc.MaxRecvMsgSize(ds.config.MessageLimitSize))
+	server := grpc.NewServer(grpc.MaxSendMsgSize(config.MESSAGE_LIMIT_SIZE), grpc.MaxRecvMsgSize(config.MESSAGE_LIMIT_SIZE))
 	distribute.RegisterDistributeServiceServer(server, ds)
 	go func() {
 		<-ctx.Done()
@@ -69,14 +69,14 @@ func (dc *DistributeClient) DistributeBlock(block *types.Header, isFirstBlock bo
 		return err
 	}
 	distributeToWorker := func() error {
-		nodeID := dc.alloc(block)
-		ctx, cancel := context.WithTimeout(context.Background(), dc.config.Timeout)
+		nodeID := dc.alloc(block, false)
+		ctx, cancel := context.WithTimeout(context.Background(), config.CONNECT_TIMEOUT)
 		defer cancel()
 		server, ok := dc.config.Network.Workers[nodeID]
 		if !ok {
 			return fmt.Errorf("worker %d not found", nodeID)
 		}
-		conn, err := grpc.NewClient(server.String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.NewClient(server.DistributeString(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			return err
 		}
@@ -94,9 +94,9 @@ func (dc *DistributeClient) DistributeBlock(block *types.Header, isFirstBlock bo
 	}
 	// aggregator should have the block header to compute public witness
 	distributeToAggregator := func() error {
-		server := dc.config.Network.Aggregator
-		serverUrl := fmt.Sprintf("%s:%d", server.Address, server.DistributePort)
-		conn, err := grpc.NewClient(serverUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		nodeID := dc.alloc(block, true)
+		server := dc.config.Network.Aggregators[nodeID]
+		conn, err := grpc.NewClient(server.DistributeString(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			return err
 		}
@@ -119,10 +119,13 @@ func (dc *DistributeClient) DistributeBlock(block *types.Header, isFirstBlock bo
 
 }
 
-func (dc *DistributeClient) alloc(block *types.Header) config.NodeID {
+func (dc *DistributeClient) alloc(block *types.Header, isAggragate bool) config.NodeID {
 	// todo
-	if len(dc.config.Network.Workers) == 1 {
-		return 0
+	nbWorker := len(dc.config.Network.Workers)
+	nbAggregator := len(dc.config.Network.Aggregators)
+	if isAggragate {
+		return config.NodeID(block.Number.Uint64() % (uint64(nbAggregator)))
+	} else {
+		return nbAggregator + config.NodeID(block.Number.Uint64()%(uint64(nbWorker)))
 	}
-	return config.NodeID(block.Number.Uint64() % uint64(len(dc.config.Network.Workers)-1)) // not alloc to aggregator, we set nodeID(aggregator) = len(workers) - 1
 }

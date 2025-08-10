@@ -24,9 +24,8 @@ MAX_AGGREGATORS_PER_IP = 2
 MAX_WORKERS_PER_IP = 3
 
 # --- MODIFIED: Base ports for each role and port type ---
-AGGREGATOR_DISTRIBUTE_BASE_PORT = 9000
-AGGREGATOR_AGGREGATE_BASE_PORT = 9100 # Use a separate range for the second port
-WORKER_BASE_PORT = 10000
+DISTRIBUTE_BASE_PORT = 9000
+AGGREGATE_BASE_PORT = 10000 # Use a separate range for the second port
 
 def get_ips_from_config(config_path):
     """
@@ -97,7 +96,7 @@ def distribute_aggregators(total_needed, ips, max_per_ip, dist_base_port, agg_ba
     return processes
 
 # --- NEW FUNCTION for Workers ---
-def distribute_workers(total_needed, ips, max_per_ip, base_port, id_generator):
+def distribute_workers(total_needed, ips, max_per_ip, dist_base_port, id_generator):
     """
     Distributes workers across IPs, assigning an address (IP) and a port.
     """
@@ -123,12 +122,13 @@ def distribute_workers(total_needed, ips, max_per_ip, base_port, id_generator):
             if ip_usage_counts[current_ip] < max_per_ip:
                 ip_usage_counts[current_ip] += 1
 
-                port = base_port + i
+                dist_port = dist_base_port + i
 
                 processes.append({
                     'id': process_id,
                     'address': current_ip, # 'address' field now holds only the IP
-                    'port': port
+                    'distribute_port': dist_port,
+                    "aggregate_port": -1,
                 })
 
                 ip_iterator += 1
@@ -153,10 +153,10 @@ if __name__ == "__main__":
         # 3. Generate addresses using the new specific functions
         agg_configs = distribute_aggregators(
             NB_AGGREGATORS, aggregator_ips, MAX_AGGREGATORS_PER_IP,
-            AGGREGATOR_DISTRIBUTE_BASE_PORT, AGGREGATOR_AGGREGATE_BASE_PORT, id_counter
+            DISTRIBUTE_BASE_PORT, AGGREGATE_BASE_PORT, id_counter
         )
         worker_configs = distribute_workers(
-            NB_WORKERS, worker_ips, MAX_WORKERS_PER_IP, WORKER_BASE_PORT, id_counter
+            NB_WORKERS, worker_ips, MAX_WORKERS_PER_IP, DISTRIBUTE_BASE_PORT + NB_AGGREGATORS, id_counter
         )
 
         # 4. Print results to the console with the new format
@@ -166,7 +166,7 @@ if __name__ == "__main__":
 
         print(f"\n--- Worker Configurations ({len(worker_configs)}) ---")
         for worker in worker_configs:
-            print(f"  ID: {worker['id']:<3} Address: {worker['address']:<15} Port: {worker['port']}")
+            print(f"  ID: {worker['id']:<3} Address: {worker['address']:<15} Port: {worker['distribute_port']}")
 
         # 5. Structure the data for YAML output
         output_data = {

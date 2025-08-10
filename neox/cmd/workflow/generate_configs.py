@@ -12,7 +12,7 @@ import sys
 import os
 import yaml
 import argparse
-import json  # MODIFIED: Import the json library
+import json
 
 # --- Default Configuration ---
 ADDRESS_FILE = "network.yml"
@@ -53,8 +53,8 @@ def build_shared_network_config(address_data):
     workers_map = {worker['id']: {k: v for k, v in worker.items() if k != 'id'} for worker in worker_configs}
 
     return {
-        "agg_severs": aggregators_map,
-        "node_severs": workers_map,
+        "agg_servers": aggregators_map,
+        "worker_servers": workers_map,
         "block_source": SHARED_BLOCK_SOURCE
     }
 
@@ -86,17 +86,19 @@ def generate_final_configs(address_data, instance_data, args):
         node_id = node_info['id']
         node_ip = node_info['address']
 
-        local_port = node_info.get('distribute_port') or node_info.get('port')
-        local_url = {'address': node_ip, 'port': local_port}
+        distribute_port = node_info.get('distribute_port')
+        aggregate_port = node_info.get('aggregate_port')
+        local_url = {'address': node_ip, 'distribute_port': distribute_port, 'aggregate_port': aggregate_port}
 
         service_config = {
-            'ID': node_id,
-            'Network': shared_network_config,
-            'Local': local_url,
-            'GrpcConfig': SHARED_GRPC_CONFIG
+            'id': node_id,
+            'network': shared_network_config,
+            'local': local_url,
+            'grpc_config': SHARED_GRPC_CONFIG
         }
 
         node_config = base_node_config.copy()
+        node_config["job"] = 0 if node_type == 'worker' else 1 # todo manager 2
         node_specific_paths = instance_data.get(node_ip)
         if not node_specific_paths:
             print(f"Warning: No specific path data for IP {node_ip} in '{args.instance}'. NodeConfig may be incomplete.", file=sys.stderr)

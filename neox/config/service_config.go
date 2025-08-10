@@ -2,46 +2,41 @@ package config
 
 import (
 	"fmt"
-	"time"
 )
 
 type ServiceConfig struct {
-	ID      NodeID
-	Network NetworkConfig
-	Local   BaseURL
-	GrpcConfig
-}
-
-type AggregateURL struct {
-	Address        string `json:"address"`
-	DistributePort int    `json:"distributePort"`
-	AggregatorPort int    `json:"aggregatorPort"`
-}
-
-func (url *AggregateURL) DistributeString() string {
-	return fmt.Sprintf("%s:%d", url.Address, url.DistributePort)
-}
-func (url *AggregateURL) AggregateString() string {
-	return fmt.Sprintf("%s:%d", url.Address, url.AggregatorPort)
+	ID      NodeID        `json:"id"`
+	Network NetworkConfig `json:"network"`
+	Local   BaseURL       `json:"local"`
+	//GrpcConfig `json:"grpc_config"`
 }
 
 type NodeID = int
+type WorkerID = NodeID
+type AggregatorID = NodeID
+
+// NetworkConfig all nodes have a same NetworkConfig
 type NetworkConfig struct {
-	Aggregator  AggregateURL       `json:"agg_sever"`
-	Workers     map[NodeID]BaseURL `json:"node_severs"`
-	BlockSource string             `json:"block_source"`
+	Aggregators map[AggregatorID]BaseURL `json:"agg_servers"`
+	Workers     map[WorkerID]BaseURL     `json:"worker_servers"`
+	BlockSource string                   `json:"block_source"`
 }
 
 type BaseURL struct {
-	Address string `json:"address"`
-	Port    int    `json:"port"`
+	Address        string `json:"address"`
+	DistributePort int    `json:"distribute_port"`
+	AggregatorPort int    `json:"aggregate_port"`
 }
 
-func (url *BaseURL) String() string {
-	return fmt.Sprintf("%s:%d", url.Address, url.Port)
+func (url *BaseURL) DistributeString() string {
+	return fmt.Sprintf("%s:%d", url.Address, url.DistributePort)
+}
+func (url *BaseURL) AggregateString() string {
+	return fmt.Sprintf("%s:%d", url.Address, url.AggregatorPort)
 }
 
-type GrpcConfig struct {
-	MessageLimitSize int
-	Timeout          time.Duration
-}
+//// GrpcConfig all nodes have a same GrpcConfig
+//type GrpcConfig struct {
+//	MessageLimitSize int           `json:"message_limit_size"`
+//	Timeout          time.Duration `json:"timeout"`
+//}

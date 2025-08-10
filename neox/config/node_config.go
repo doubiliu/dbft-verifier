@@ -7,17 +7,26 @@ import (
 	"os"
 )
 
-type NodeMode = int
 type InstanceConfig = pipeline.InstanceConfig
+type NodeMode = int
 
 const (
 	Serial NodeMode = iota
 	Pipeline
 )
 
+type NodeJob = int
+
+const (
+	Worker NodeJob = iota
+	Aggregator
+	Manager
+)
+
 // NodeConfig gives a configuration of node
 type NodeConfig struct {
 	Mode NodeMode `json:"mode"`
+	Job  NodeJob  `json:"job"`
 	//NbMaxCPU         int // cpu number
 	NbSolve          int            `json:"nb_solve"` // solver number todo we fix it 1
 	NbProve          int            `json:"nb_prove"` // prover number todo we fix it 1

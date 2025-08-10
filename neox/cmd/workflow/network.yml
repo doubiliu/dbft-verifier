@@ -2,18 +2,21 @@ aggregators:
 - id: 0
   address: 172.23.166.111
   distribute_port: 9000
-  aggregate_port: 9100
+  aggregate_port: 10000
 - id: 1
   address: 172.23.166.111
   distribute_port: 9001
-  aggregate_port: 9101
+  aggregate_port: 10001
 workers:
 - id: 2
   address: 172.23.166.111
-  port: 10000
+  distribute_port: 9002
+  aggregate_port: -1
 - id: 3
   address: 172.23.166.111
-  port: 10001
+  distribute_port: 9003
+  aggregate_port: -1
 - id: 4
   address: 172.23.166.111
-  port: 10002
+  distribute_port: 9004
+  aggregate_port: -1
