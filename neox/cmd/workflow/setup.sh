@@ -32,6 +32,7 @@ for node_dir in $node_dirs; do
         echo "copy main into $node_dir"
         cp ./main "$node_dir"
         cp ./start_all.sh "$node_dir"
+        cp ./stop_all.sh "$node_dir"
     fi
 done
 
