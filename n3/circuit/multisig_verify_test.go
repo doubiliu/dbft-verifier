@@ -2,194 +2,215 @@ package circuit
 
 import (
 	native_crypto "crypto/ecdsa"
-	"crypto/sha256"
-	"encoding/hex"
+	"crypto/elliptic"
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
-	gc_ecdsa "github.com/consensys/gnark-crypto/ecc/secp256k1/ecdsa"
 	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/frontend/cs/scs"
-	"github.com/consensys/gnark/std/algebra/emulated/sw_emulated"
-	"github.com/consensys/gnark/std/math/bits"
 	"github.com/consensys/gnark/std/math/emulated"
+	"github.com/consensys/gnark/std/math/uints"
 	"github.com/consensys/gnark/std/signature/ecdsa"
 	"github.com/consensys/gnark/test"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/nspcc-dev/neo-go/pkg/core/block"
+	"github.com/nspcc-dev/neo-go/pkg/crypto/hash"
 	"math/big"
 	_ "math/big"
-	"math/rand"
-	"strconv"
 	"testing"
-	"time"
 )
 
 func TestMultiSigVerifyCircuit(t *testing.T) {
 	assert := test.NewAssert(t)
-	source := rand.NewSource(time.Now().UnixNano())
-	rand := rand.New(source)
-	key, err := ecies.GenerateKey(rand, crypto.S256(), nil)
-	publicKey := native_crypto.PublicKey{key.PublicKey.Curve, key.PublicKey.X, key.PublicKey.Y}
-	pubBytes := crypto.CompressPubkey(&publicKey)
-	privateKey := native_crypto.PrivateKey{publicKey, key.D}
-
-	fmt.Printf("publicKeys:")
-	fmt.Printf(hex.EncodeToString(pubBytes))
-	fmt.Printf("\n")
-
-	// sign
-	data := []byte("testing ECDSA (pre-hashed)")
-	msg := sha256.Sum256(data)
-	/*	native_crypto.Sign(rand,&privateKey,msg[:])
-	 */
-	sign, err := crypto.Sign(msg[:], &privateKey)
-	if err != nil {
-		panic(err)
+	header := new(block.Header)
+	err := header.UnmarshalJSON([]byte(
+		`{
+			"hash": "0x580ede92e9c41f6e0edd491d66bfac11cb38749744f725117636b0f600ac0bda",
+			"size": 696,
+			"version": 0,
+			"previousblockhash": "0x92661b2985f7649edad5465f0a3fb19d4289051f43bd242f60660cb49594f19d",
+			"merkleroot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+			"time": 1628062127819,
+			"nonce": "EB9DB8F0012A3C1E",
+			"index": 9999,
+			"primary": 3,
+			"nextconsensus": "NVg7LjGcUSrgxgjX3zEgqaksfMaiS8Z6e1",
+			"witnesses": [
+				{
+					"invocation": "DEDCjfeKUw2coerAOvs12ffgbaXZf0LK3zl9XdBlFWfsqxajuVK41g3hjiZCp2THdrvPD0VWmbz8wSZbNMO+vGP5DECR2m0A8VPtPNEhqg+ozlcnO5+SRDpDuzvZdJuVp4W+we37U9rjaR21GRYOua4gLIyfNhqKxEOI22zquu6rjPDPDEArOI2hfb2CmzK2HhTm4Yt2UBUb0wv6vTB88y+p/famfLq+czL2Y7k97zEPZM7or7bv59/Yx3XDSiB7+PqCBiPTDEDP5qcfswgIxSxBD5JC0gt35NCii3gNKYRBriFTBIJiKXR1sbYiXfYPr6uVmKjJ/NYgfHHGXfR4+F1+ycn8JYZcDEArw7JN1A2iEmq3XCQ5Kvl8uc4VWJ/I0KHD0i/sTW8834/AkrLML+XGY4pmNr4kqENJNULEi4ZOBRQawiOn0LiZ",
+					"verification": "FQwhAkhv0VcCxEkKJnAxEqXMHQkj/Wl6M0Br1aHADgATsJpwDCECTHt/tsMQ/M8bozsIJRnYKWTqk4aNZ2Zi1KWa1UjfDn0MIQKq7DhHD2qtAELG6HfP2Ah9Jnaw9Rb93TYoAbm9OTY5ngwhA7IJ/U9TpxcOpERODLCmu2pTwr0BaSaYnPhfmw+6F6cMDCEDuNnVdx2PUTqghpucyNUJhkA7eMbaNokGOMPUalrc4EoMIQLKDidpe5wkj28W4IX9AGHib0TahbWO6DXBEMql7DulVAwhAt9I9g6PPgHEj/QLm38TENeosqGTGIvv4cLj33QOiVCTF0Ge0Nw6"
+				}
+			],
+			"confirmations": 7198226,
+			"nextblockhash": "0xd0e2c5cd98d58eeb66c4f8413a798a75e4adaca7f1e8862bf6c3ad9d671ee6f5"
+		}`,
+	))
+	hash := hash.NetSha256(860833102, header)
+	VerificationScript := header.Script.VerificationScript
+	InvocationScript := header.Script.InvocationScript
+	bytesToVariables := func(input []byte) []uints.U8 {
+		output := make([]uints.U8, len(input))
+		for i := 0; i < len(input); i++ {
+			output[i] = uints.NewU8(input[i])
+		}
+		return output
 	}
-	fmt.Printf("signature length:" + strconv.Itoa(len(sign)))
-	fmt.Printf("\n")
-	fmt.Printf("signature:")
-	fmt.Printf(hex.EncodeToString(sign))
-	fmt.Printf("\n")
-	/*	var sig gc_ecdsa.Signature
-		_, err = sig.SetBytes(sign)
+	pubPoints := make([]ecdsa.PublicKey[emulated.P256Fp, emulated.P256Fr], 7)
+	pubKeys := make([]native_crypto.PublicKey, 7)
+	for i := 0; i < 7; i++ {
+		// Key data
+		pubs := VerificationScript[i*PublicKeyDataLen+3 : (i+1)*PublicKeyDataLen+1]
+		pubkey, err := DecompressPubkey(pubs)
 		if err != nil {
 			panic(err)
-		}*/
-	r, s := new(big.Int), new(big.Int)
-	r.SetBytes(sign[:32])
-	s.SetBytes(sign[32:64])
-
-	flag := native_crypto.Verify(&publicKey, msg[:], r, s)
-	if !flag {
-		t.Errorf("can't verify signature")
+		}
+		pubKeys[i] = *pubkey
+		pubPoints[i] = ecdsa.PublicKey[emulated.P256Fp, emulated.P256Fr]{
+			X: emulated.ValueOf[emulated.P256Fp](pubkey.X),
+			Y: emulated.ValueOf[emulated.P256Fp](pubkey.Y),
+		}
 	}
-	hash := gc_ecdsa.HashToInt(msg[:])
-
-	MsgScript := make([]frontend.Variable, len(msg))
-	for i := 0; i < len(msg); i++ {
-		MsgScript[i] = msg[i]
-	}
-	PubScript := make([]frontend.Variable, len(pubBytes))
-	for i := 0; i < len(pubBytes); i++ {
-		PubScript[i] = pubBytes[i]
-	}
-	SigScript := make([]frontend.Variable, len(sign))
-	for i := 0; i < len(sign); i++ {
-		SigScript[i] = sign[i]
-	}
-	circuit := TempVerifyStruct[emulated.Secp256k1Fp, emulated.Secp256k1Fr]{
-		PubScript: make([]frontend.Variable, len(pubBytes)),
-		SigScript: make([]frontend.Variable, len(sign)),
-		MsgScript: make([]frontend.Variable, len(msg)),
+	MappingRules := make([]frontend.Variable, 5)
+	for i := 0; i < 5; i++ {
+		sig := InvocationScript[i*SignatureDataLen+2 : (i+1)*SignatureDataLen]
+		r, s := new(big.Int), new(big.Int)
+		r.SetBytes(sig[:32])
+		s.SetBytes(sig[32:64])
+		for j := 0; j < len(pubKeys); j++ {
+			flag := native_crypto.Verify(&pubKeys[j], hash[:], r, s)
+			if flag {
+				MappingRules[i] = frontend.Variable(j)
+			}
+		}
 	}
 
-	witness := TempVerifyStruct[emulated.Secp256k1Fp, emulated.Secp256k1Fr]{
-		MsgScript: MsgScript,
-		PubScript: PubScript,
-		PubKey: ecdsa.PublicKey[emulated.Secp256k1Fp, emulated.Secp256k1Fr]{
-			X: emulated.ValueOf[emulated.Secp256k1Fp](publicKey.X),
-			Y: emulated.ValueOf[emulated.Secp256k1Fp](publicKey.Y),
-		},
-		Sig: ecdsa.Signature[emulated.Secp256k1Fr]{
-			R: emulated.ValueOf[emulated.Secp256k1Fr](r),
-			S: emulated.ValueOf[emulated.Secp256k1Fr](s),
-		},
-		Hash:      emulated.ValueOf[emulated.Secp256k1Fr](hash),
-		SigScript: SigScript,
+	circuit := MultiSigVerifyWrapper[emulated.P256Fp, emulated.P256Fr]{
+		Hash:               [32]uints.U8(uints.NewU8Array(hash[:])),
+		PubKeys:            pubPoints,
+		MappingRules:       MappingRules,
+		VerificationScript: bytesToVariables(VerificationScript),
+		InvocationScript:   bytesToVariables(InvocationScript),
+	}
+
+	witness := MultiSigVerifyWrapper[emulated.P256Fp, emulated.P256Fr]{
+		Hash:               [32]uints.U8(uints.NewU8Array(hash[:])),
+		PubKeys:            pubPoints,
+		MappingRules:       MappingRules,
+		VerificationScript: bytesToVariables(VerificationScript),
+		InvocationScript:   bytesToVariables(InvocationScript),
 	}
 	err = test.IsSolved(&circuit, &witness, ecc.BN254.ScalarField())
-	_, err = frontend.Compile(ecc.BN254.ScalarField(), scs.NewBuilder, &circuit)
 	assert.NoError(err)
 }
 
-type TempVerifyStruct[T, S emulated.FieldParams] struct {
-	MsgScript []frontend.Variable
-	PubScript []frontend.Variable
-	SigScript []frontend.Variable
-	PubKey    ecdsa.PublicKey[T, S]
-	Sig       ecdsa.Signature[S]
-	Hash      emulated.Element[S]
+func TestCheckPubKeyFormatCircuit(t *testing.T) {
+	assert := test.NewAssert(t)
+	header := new(block.Header)
+	err := header.UnmarshalJSON([]byte(
+		`{
+			"hash": "0x580ede92e9c41f6e0edd491d66bfac11cb38749744f725117636b0f600ac0bda",
+			"size": 696,
+			"version": 0,
+			"previousblockhash": "0x92661b2985f7649edad5465f0a3fb19d4289051f43bd242f60660cb49594f19d",
+			"merkleroot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+			"time": 1628062127819,
+			"nonce": "EB9DB8F0012A3C1E",
+			"index": 9999,
+			"primary": 3,
+			"nextconsensus": "NVg7LjGcUSrgxgjX3zEgqaksfMaiS8Z6e1",
+			"witnesses": [
+				{
+					"invocation": "DEDCjfeKUw2coerAOvs12ffgbaXZf0LK3zl9XdBlFWfsqxajuVK41g3hjiZCp2THdrvPD0VWmbz8wSZbNMO+vGP5DECR2m0A8VPtPNEhqg+ozlcnO5+SRDpDuzvZdJuVp4W+we37U9rjaR21GRYOua4gLIyfNhqKxEOI22zquu6rjPDPDEArOI2hfb2CmzK2HhTm4Yt2UBUb0wv6vTB88y+p/famfLq+czL2Y7k97zEPZM7or7bv59/Yx3XDSiB7+PqCBiPTDEDP5qcfswgIxSxBD5JC0gt35NCii3gNKYRBriFTBIJiKXR1sbYiXfYPr6uVmKjJ/NYgfHHGXfR4+F1+ycn8JYZcDEArw7JN1A2iEmq3XCQ5Kvl8uc4VWJ/I0KHD0i/sTW8834/AkrLML+XGY4pmNr4kqENJNULEi4ZOBRQawiOn0LiZ",
+					"verification": "FQwhAkhv0VcCxEkKJnAxEqXMHQkj/Wl6M0Br1aHADgATsJpwDCECTHt/tsMQ/M8bozsIJRnYKWTqk4aNZ2Zi1KWa1UjfDn0MIQKq7DhHD2qtAELG6HfP2Ah9Jnaw9Rb93TYoAbm9OTY5ngwhA7IJ/U9TpxcOpERODLCmu2pTwr0BaSaYnPhfmw+6F6cMDCEDuNnVdx2PUTqghpucyNUJhkA7eMbaNokGOMPUalrc4EoMIQLKDidpe5wkj28W4IX9AGHib0TahbWO6DXBEMql7DulVAwhAt9I9g6PPgHEj/QLm38TENeosqGTGIvv4cLj33QOiVCTF0Ge0Nw6"
+				}
+			],
+			"confirmations": 7198226,
+			"nextblockhash": "0xd0e2c5cd98d58eeb66c4f8413a798a75e4adaca7f1e8862bf6c3ad9d671ee6f5"
+		}`,
+	))
+	VerificationScript := header.Script.VerificationScript
+	for i := 0; i < 7; i++ {
+		// Key data
+		pubs := VerificationScript[i*PublicKeyDataLen+3 : (i+1)*PublicKeyDataLen+1]
+		pubU8s := make([]frontend.Variable, len(pubs))
+		for j := 0; j < len(pubs); j++ {
+			pubU8s[j] = pubs[j]
+		}
+		pubkey, err := DecompressPubkey(pubs)
+		if err != nil {
+			panic(err)
+		}
+		circuit := TempForamtCheckStruct[emulated.P256Fp, emulated.P256Fr]{
+			Pubs: pubU8s,
+			PubsPoint: ecdsa.PublicKey[emulated.P256Fp, emulated.P256Fr]{
+				X: emulated.ValueOf[emulated.P256Fp](pubkey.X),
+				Y: emulated.ValueOf[emulated.P256Fp](pubkey.Y),
+			},
+		}
+
+		witness := TempForamtCheckStruct[emulated.P256Fp, emulated.P256Fr]{
+			Pubs: pubU8s,
+			PubsPoint: ecdsa.PublicKey[emulated.P256Fp, emulated.P256Fr]{
+				X: emulated.ValueOf[emulated.P256Fp](pubkey.X),
+				Y: emulated.ValueOf[emulated.P256Fp](pubkey.Y),
+			},
+		}
+		err = test.IsSolved(&circuit, &witness, ecc.BN254.ScalarField())
+	}
+	assert.NoError(err)
 }
 
-// Define declares the circuit's constraints
-func (c *TempVerifyStruct[T, S]) Define(api frontend.API) error {
-	pubsPoint := c.PubKey
-	compressByte := c.PubScript[0]
-	pubBytes := c.PubScript[1:]
-	field, err := emulated.NewField[T](api)
-	if err != nil {
-		return err
+func DecompressPubkey(pubkey []byte) (*native_crypto.PublicKey, error) {
+	x, y := new(big.Int), new(big.Int)
+	if len(pubkey) != 33 {
+		return nil, fmt.Errorf("invalid public key")
 	}
-	field2, err := emulated.NewField[S](api)
-	if err != nil {
-		return err
+	if (pubkey[0] != 0x02) && (pubkey[0] != 0x03) {
+		return nil, fmt.Errorf("invalid public key")
 	}
-	xbits := field.ToBits(&pubsPoint.X)
-	ybits := field.ToBits(&pubsPoint.Y)
+	if x == nil {
+		return nil, fmt.Errorf("invalid public key")
+	}
+	x.SetBytes(pubkey[1:])
 
-	//check&calculate first byte(compressed)=0x02 or0x03
-	twoBits := bits.ToBinary(api, byte(2), bits.WithNbDigits(8))
-	compressedBits := make([]frontend.Variable, len(twoBits))
-	for z := range twoBits {
-		if z == 0 {
-			compressedBits[z] = api.Or(twoBits[z], ybits[0])
+	xxx := new(big.Int).Mul(x, x)
+	xxx.Mul(xxx, x)
+
+	ax := new(big.Int).Mul(big.NewInt(3), x)
+
+	yy := new(big.Int).Sub(xxx, ax)
+	yy.Add(yy, elliptic.P256().Params().B)
+
+	y1 := new(big.Int).ModSqrt(yy, elliptic.P256().Params().P)
+	if y1 == nil {
+		return nil, fmt.Errorf("can not revcovery public key")
+	}
+
+	y2 := new(big.Int).Neg(y1)
+	y2.Mod(y2, elliptic.P256().Params().P)
+
+	if pubkey[0] == 0x02 {
+		if y1.Bit(0) == 0 {
+			y = y1
 		} else {
-			compressedBits[z] = twoBits[z]
+			y = y2
+		}
+	} else {
+		if y1.Bit(0) == 1 {
+			y = y1
+		} else {
+			y = y2
 		}
 	}
-	compressed := bits.FromBinary(api, compressedBits, bits.WithNbDigits(8))
-	api.AssertIsEqual(compressed, compressByte)
+	//fmt.Println("dx:",x)
+	//fmt.Println("dy:",y)
+	return &native_crypto.PublicKey{X: x, Y: y, Curve: elliptic.P256()}, nil
+}
 
-	//check compress pubKey x bytes =pub.x
-	pubReverseBytes := make([]frontend.Variable, len(pubBytes))
-	for i := 0; i < len(pubReverseBytes); i++ {
-		index := len(pubReverseBytes) - 1 - i
-		pubReverseBytes[i] = pubBytes[index]
-	}
-	var pubReverseXBits []frontend.Variable
-	for i := 0; i < len(pubReverseBytes); i++ {
-		tempBits := bits.ToBinary(api, pubReverseBytes[i], bits.WithNbDigits(8))
-		pubReverseXBits = append(pubReverseXBits, tempBits...)
-	}
-	api.AssertIsEqual(len(pubReverseXBits), len(xbits))
-	for k := range xbits {
-		api.AssertIsEqual(pubReverseXBits[k], xbits[k])
-	}
-	//check signatures
-	rBits := field2.ToBits(&c.Sig.R)
-	sBits := field2.ToBits(&c.Sig.S)
+type TempForamtCheckStruct[T, S emulated.FieldParams] struct {
+	PubsPoint ecdsa.PublicKey[T, S]
+	Pubs      []frontend.Variable
+}
 
-	var rBytes []frontend.Variable
-	for i := 0; i < 32; i++ {
-		temp := bits.FromBinary(api, rBits[i*8:(i+1)*8])
-		rBytes = append(rBytes, temp)
-	}
-	var sBytes []frontend.Variable
-	for i := 0; i < 32; i++ {
-		temp := bits.FromBinary(api, sBits[i*8:(i+1)*8])
-		sBytes = append(sBytes, temp)
-	}
-	rReverseBytes := make([]frontend.Variable, len(rBytes))
-	for i := 0; i < len(rReverseBytes); i++ {
-		index := len(rReverseBytes) - 1 - i
-		rReverseBytes[i] = rBytes[index]
-	}
-	sReverseBytes := make([]frontend.Variable, len(sBytes))
-	for i := 0; i < len(sReverseBytes); i++ {
-		index := len(sReverseBytes) - 1 - i
-		sReverseBytes[i] = sBytes[index]
-	}
-	var tSigBytes []frontend.Variable
-	tSigBytes = append(tSigBytes, rReverseBytes...)
-	tSigBytes = append(tSigBytes, sReverseBytes...)
-	sigBytes := c.SigScript
-
-	api.AssertIsEqual(len(tSigBytes), len(sigBytes)-1)
-	for k := range tSigBytes {
-		api.AssertIsEqual(tSigBytes[k], sigBytes[k])
-	}
-	//verify sign
-	pubsPoint.Verify(api, sw_emulated.GetCurveParams[T](), &c.Hash, &c.Sig)
+func (c *TempForamtCheckStruct[T, S]) Define(api frontend.API) error {
+	verify := NewMultiSigVerify[T, S](api)
+	verify.CheckPubKeyFormat(c.PubsPoint, c.Pubs)
 	return nil
 }
