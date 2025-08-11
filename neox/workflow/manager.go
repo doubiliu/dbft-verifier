@@ -2,11 +2,13 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/txhsl/neox-dbft-verifier/config"
 	"github.com/txhsl/neox-dbft-verifier/service"
 	"math/big"
+	"os"
 	"time"
 )
 
@@ -29,6 +31,7 @@ func NewBlockManager(cfg config.ServiceConfig) *BlockManager {
 	}
 }
 func (manager *BlockManager) Start() error {
+	fmt.Println(manager.config)
 	client, err := ethclient.Dial(manager.config.Network.BlockSource)
 	if err != nil {
 		return fmt.Errorf("failed to dial block source: %w", err)
@@ -99,4 +102,20 @@ func (manager *BlockManager) Stop() {
 
 func (manager *BlockManager) Feedback() chan error {
 	return manager.feedback
+}
+
+func (manager *BlockManager) FromJson(jsonPath string) error {
+	var serviceConfig config.ServiceConfig
+	fileContent, err := os.ReadFile(jsonPath)
+	if err != nil {
+		return fmt.Errorf("load config error: %w", err)
+	}
+	if err := json.Unmarshal(fileContent, &serviceConfig); err != nil {
+		return fmt.Errorf("load config error: %w", err)
+	}
+	manager.config = &serviceConfig
+	manager.stopCh = make(chan struct{}, 1)
+	manager.feedback = make(chan error, 1)
+	manager.DistributeClient = *service.NewDistributeClient(*manager.config)
+	return nil
 }

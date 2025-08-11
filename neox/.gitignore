@@ -17,3 +17,9 @@ circuit/Phase2*
 circuit/srs*
 nohup.out
 cmd/meta/*
+cmd/workflow/configs/*
+*/*.yml
+*/main
+main
+*/*.txt
+*/*.log

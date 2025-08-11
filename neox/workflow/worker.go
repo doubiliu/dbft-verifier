@@ -26,6 +26,13 @@ type Worker struct {
 	feedback chan error
 }
 
+func (n *Worker) RuntimeJob() config.NodeJob {
+	return config.Worker
+}
+func (n *Worker) RuntimeMode() config.NodeMode {
+	return n.Mode
+}
+
 func (n *Worker) Start() error {
 	//runtime.GOMAXPROCS(n.NbMaxCPU)
 	if n.Job != config.Worker {
@@ -305,12 +312,13 @@ func (n *Worker) runInPipeline() error {
 	return nil
 }
 
-func (n *Worker) FromJson(jsonPath string) error {
-	var err error
-	n.CommonConfig, err = config.LoadConfigFromJson(jsonPath)
-	if err != nil {
-		return err
-	}
+func (n *Worker) FromCommonConfig(cc config.CommonConfig, params ...any) error {
+	//var err error
+	//n.CommonConfig, err = config.LoadConfigFromJson(jsonPath)
+	//if err != nil {
+	//	return err
+	//}
+	n.CommonConfig = cc
 	n.feedback = make(chan error, 100) // todo
 	n.AggregateClient = *service.NewAggregateClient(n.ServiceConfig)
 	n.DistributeServer = *service.NewDistributeServer(n.ServiceConfig, n.feedback)

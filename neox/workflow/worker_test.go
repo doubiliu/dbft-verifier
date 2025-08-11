@@ -14,5 +14,4 @@ func TestWorkerWorkflow(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-
 }

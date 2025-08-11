@@ -81,6 +81,13 @@ type Aggregator struct {
 	//verifyInstance         pipeline.PackedCircuitInstance
 }
 
+func (agg *Aggregator) RuntimeJob() config.NodeJob {
+	return config.Aggregator
+}
+func (agg *Aggregator) RuntimeMode() config.NodeMode {
+	return agg.Mode
+}
+
 func (agg *Aggregator) loadOneTimeRlpInstance() error {
 	oneTimeInstance, err := pipeline.LoadFromInstanceConfig(agg.RlpHashInstance)
 	if err != nil {
@@ -365,12 +372,17 @@ func (agg *Aggregator) runInSerial() error {
 	return nil
 }
 
-func (agg *Aggregator) FromJson(jsonPath string, isNoFork bool) error {
-	var err error
-	agg.CommonConfig, err = config.LoadConfigFromJson(jsonPath)
-	if err != nil {
-		return err
+func (agg *Aggregator) FromCommonConfig(cc config.CommonConfig, params ...any) error {
+	agg.CommonConfig = cc
+	isNoFork := true
+	if len(params) != 0 {
+		_, ok := params[0].(bool)
+		if !ok {
+			return errors.New("invalid param")
+		}
+		isNoFork = params[0].(bool)
 	}
+	//agg.CommonConfig, err = config.LoadConfigFromJson(jsonPath)
 	fmt.Println(agg.CommonConfig.Network)
 	agg.feedback = make(chan error, 100) // todo
 	agg.DistributeServer = *service.NewDistributeServer(agg.ServiceConfig, agg.feedback)

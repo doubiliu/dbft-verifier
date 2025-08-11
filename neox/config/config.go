@@ -11,6 +11,13 @@ type CommonConfig struct {
 	ServiceConfig
 }
 
+func (c *CommonConfig) IsAggregator() bool {
+	return c.Job == Aggregator
+}
+func (c *CommonConfig) IsWorker() bool {
+	return c.Job == Worker
+}
+
 func LoadConfigFromJson(jsonPath string) (CommonConfig, error) {
 	type configWrapper struct {
 		Node    NodeConfig    `json:"NodeConfig"`

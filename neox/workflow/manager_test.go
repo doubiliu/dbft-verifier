@@ -1,39 +1,21 @@
 package workflow
 
-//
-//func TestManagerWorkflow(t *testing.T) {
-//	serviceConfig := config.ServiceConfig{
-//		ID: -1, // manager
-//		Local: config.BaseURL{
-//			Address: "localhost",
-//			Port:    8887,
-//		},
-//		GrpcConfig: config.GrpcConfig{
-//			MessageLimitSize: 1024 * 1024 * 1024,
-//			Timeout:          5 * time.Second,
-//		},
-//		Network: config.NetworkConfig{
-//			Aggregator: config.AggregateURL{
-//				Address:        "localhost",
-//				DistributePort: 8888,
-//				AggregatorPort: 8889,
-//			},
-//			BlockSource: "https://neoxt4seed1.ngd.network/",
-//			Workers: map[config.NodeID]config.BaseURL{
-//				0: {
-//					Address: "localhost",
-//					Port:    8890,
-//				},
-//			},
-//		},
-//	}
-//	manager := NewBlockManager(serviceConfig)
-//	err := manager.Start()
-//	if err != nil {
-//		panic(err)
-//	}
-//	for err := range manager.Feedback() {
-//		panic(err)
-//	}
-//
-//}
+import (
+	"testing"
+)
+
+func TestManagerWorkflow(t *testing.T) {
+	manager := new(BlockManager)
+	err := manager.FromJson("../cmd/workflow/configs/manager.json")
+	if err != nil {
+		panic(err)
+	}
+	err = manager.Start()
+	if err != nil {
+		panic(err)
+	}
+	for err := range manager.Feedback() {
+		panic(err)
+	}
+
+}

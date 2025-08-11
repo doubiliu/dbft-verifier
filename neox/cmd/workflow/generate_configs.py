@@ -57,6 +57,23 @@ def build_shared_network_config(address_data):
         "worker_servers": workers_map,
         "block_source": SHARED_BLOCK_SOURCE
     }
+def generate_manager_config(shared_network_config):
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+    # 管理器配置结构：network部分完整保留，其余部分置空
+    manager_config = {
+        "id": -1,
+        "network": shared_network_config,
+        "local": {},
+    }
+
+    # 保存到configs目录下的manager.json
+    output_path = os.path.join(OUTPUT_DIR, "manager.json")
+    with open(output_path, 'w') as f:
+        json.dump(manager_config, f, indent=4)
+
+    print(f"  -> Generated manager config at '{output_path}'")
 
 
 def generate_final_configs(address_data, instance_data, args):
@@ -112,16 +129,17 @@ def generate_final_configs(address_data, instance_data, args):
 
         # --- MODIFICATIONS FOR JSON OUTPUT ---
         ip_specific_dir = os.path.join(OUTPUT_DIR, node_ip)
-        os.makedirs(ip_specific_dir, exist_ok=True)
         # 1. Change file extension to .json
-        output_filename = os.path.join(ip_specific_dir, f"config_node_{node_id}.json")
+        nodes_dir = os.path.join(ip_specific_dir, f"node_{node_id}")
+        os.makedirs(nodes_dir, exist_ok=True)
 
+        output_filename = os.path.join(nodes_dir, "common_config.json")
         with open(output_filename, 'w') as f:
             # 2. Use json.dump for formatted JSON output
             json.dump(final_config, f, indent=4)
 
         print(f"  -> Generated full config for {node_type} ID {node_id} at '{output_filename}'")
-
+    generate_manager_config(shared_network_config)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
