@@ -6,14 +6,13 @@ import (
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/test"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"testing"
 )
 
 func TestKecc256Circuit(t *testing.T) {
 	assert := test.NewAssert(t)
-	header := new(types.Header)
+	header := new(EthBlockHeader)
 	err := header.UnmarshalJSON([]byte(
 		`{
 			"baseFeePerGas": "0x4a817c800",
@@ -41,7 +40,7 @@ func TestKecc256Circuit(t *testing.T) {
 			"withdrawalsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
 		}`,
 	))
-	rlpBytes, err := EncodeHeader(header, false)
+	rlpBytes, err := header.Encode(false)
 	assert.NoError(err)
 	k := common.BytesToHash(crypto.Keccak256(rlpBytes))
 	fmt.Println(crypto.Keccak256(rlpBytes))

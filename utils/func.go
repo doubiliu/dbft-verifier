@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/types"
 	"io"
 	"os"
 	"path/filepath"
@@ -22,8 +21,4 @@ func WriteToFile(item io.WriterTo, path string) error {
 		return err
 	}
 	return file.Close()
-}
-
-func GetBlockHeaderExtraVersion(header *types.Header) byte {
-	return header.Extra[0]
 }

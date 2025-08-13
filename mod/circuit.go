@@ -1,4 +1,4 @@
-package pipeline
+package mod
 
 import (
 	"github.com/consensys/gnark/backend/groth16"

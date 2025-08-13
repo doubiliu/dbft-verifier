@@ -62,11 +62,12 @@ func (c *CompressHeaderWrapper) Define(api frontend.API) error {
 
 func TestCompressCircuit(t *testing.T) {
 	parent, _ := HeaderTestData(ExtraV1)
-	header, err := GetHeaderParamter(parent)
+	h := NewEthBlockHeader(parent)
+	header, err := h.ToHeaderParameter()
 	assert.NoError(t, err)
 	noSig, err := header.NoSigHeader()
 	assert.NoError(t, err)
-	compressHeader, err := GetCompressedHeaderParameters(parent)
+	compressHeader, err := h.ToCompressedHeaderParameters()
 	assert.NoError(t, err)
 	fmt.Println(333, len(compressHeader.Extra.Variables), compressHeader.Extra.Length)
 	circuit := CompressHeaderWrapper{Header: noSig, CompressHeader: compressHeader}

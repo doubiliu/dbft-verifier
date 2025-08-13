@@ -8,9 +8,12 @@ import (
 	"github.com/consensys/gnark/backend/witness"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
 	"github.com/txhsl/neox-dbft-verifier/helper"
+	"github.com/txhsl/neox-dbft-verifier/mod"
 	"sync"
 )
 
+type InstanceConfig = mod.InstanceConfig
+type PackedCircuitInstance = mod.PackedCircuitInstance
 type PipeScheduler struct {
 	nbSolve    int
 	nbProve    int

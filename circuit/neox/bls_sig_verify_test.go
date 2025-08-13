@@ -10,14 +10,13 @@ import (
 	"github.com/consensys/gnark/std/algebra/emulated/sw_bls12381"
 	"github.com/consensys/gnark/test"
 	"github.com/consensys/gnark/test/unsafekzg"
-	"github.com/ethereum/go-ethereum/core/types"
 	"log"
 	"testing"
 )
 
 func TestMultiSigVerifyCircuit(t *testing.T) {
 	assert := test.NewAssert(t)
-	header := new(types.Header)
+	header := new(EthBlockHeader)
 	err := header.UnmarshalJSON([]byte(
 		`{
     "baseFeePerGas": "0x4a817c800",
@@ -45,7 +44,8 @@ func TestMultiSigVerifyCircuit(t *testing.T) {
     "withdrawalsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
 }`,
 	))
-	data, err := EncodeHeader(header, true)
+
+	data, err := header.Encode(true)
 	if err != nil {
 		panic(err)
 	}

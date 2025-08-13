@@ -16,16 +16,18 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
+	neox "github.com/txhsl/neox-dbft-verifier/circuit/neox"
 	"github.com/txhsl/neox-dbft-verifier/config"
+	"github.com/txhsl/neox-dbft-verifier/mod"
 	"github.com/txhsl/neox-dbft-verifier/plugin/pipeline"
 	"github.com/txhsl/neox-dbft-verifier/service"
-	"github.com/txhsl/neox-dbft-verifier/utils"
 	"golang.org/x/sync/errgroup"
 	"time"
 )
 
+// PackedBlockHeader now, only neox use this
 type PackedBlockHeader struct {
-	header              *types.Header
+	header              circuit.HashableBlockHeader // though only neox use, but we write this in avoid to a future complex circuit
 	currentRlpHashProof groth16.Proof
 	toG2HashProof       groth16.Proof
 	noSigHashProof      groth16.Proof
@@ -33,33 +35,44 @@ type PackedBlockHeader struct {
 }
 
 func (pb *PackedBlockHeader) CanBeVerify() bool {
-	extraVersion := utils.GetBlockHeaderExtraVersion(pb.header)
-	switch extraVersion {
-	case circuit.ExtraV0:
-		return pb.header != nil && pb.currentRlpHashProof != nil && pb.noSigHashProof != nil
-	case circuit.ExtraV1, circuit.ExtraV2:
-		return pb.header != nil && pb.currentRlpHashProof != nil && pb.toG2HashProof != nil
-	default:
-		return false // todo error?
+	switch pb.header.(type) {
+	case *neox.EthBlockHeader:
+		h := pb.header.(*neox.EthBlockHeader)
+		switch h.ExtraVersion() {
+		case neox.ExtraV0:
+			return pb.header != nil && pb.currentRlpHashProof != nil && pb.noSigHashProof != nil
+		case neox.ExtraV1, neox.ExtraV2:
+			return pb.header != nil && pb.currentRlpHashProof != nil && pb.toG2HashProof != nil
+		default:
+			return false // todo error?
+		}
+	default: // todo
+		return true
+
 	}
+
 }
 func (pb *PackedBlockHeader) Proofs() (groth16.Proof, groth16.Proof, error) {
 	if !pb.CanBeVerify() {
 		return nil, nil, errors.New("can't be verify")
 	}
-	extraVersion := utils.GetBlockHeaderExtraVersion(pb.header)
-	switch extraVersion {
-	case circuit.ExtraV0:
-		return pb.currentRlpHashProof, pb.noSigHashProof, nil
-	case circuit.ExtraV1, circuit.ExtraV2:
-		return pb.currentRlpHashProof, pb.toG2HashProof, nil
+	switch pb.header.(type) {
+	case *neox.EthBlockHeader:
+		h := pb.header.(*neox.EthBlockHeader)
+		switch h.ExtraVersion() {
+		case neox.ExtraV0:
+			return pb.currentRlpHashProof, pb.noSigHashProof, nil
+		case neox.ExtraV1, neox.ExtraV2:
+			return pb.currentRlpHashProof, pb.toG2HashProof, nil
+		default:
+			return nil, nil, errors.New("invalid extra version")
+		}
 	default:
-		return nil, nil, errors.New("invalid extra version")
+		return nil, nil, nil // todo
 	}
-
 }
 
-func NewPackedBlockHeader(header *types.Header) *PackedBlockHeader {
+func NewPackedBlockHeader(header circuit.HashableBlockHeader) *PackedBlockHeader {
 	return &PackedBlockHeader{
 		header:              header,
 		currentRlpHashProof: nil,
@@ -77,7 +90,7 @@ type Aggregator struct {
 	feedback               chan error
 	isNoFork               bool // if is no fork, then parent and current is one-to-one, then when current finishes its proof, parent's PackedBlockHeader can be deleted
 	headers                map[string]*PackedBlockHeader
-	rlpHashOneTimeInstance *pipeline.PackedCircuitInstance // just use to prove the first block, then should be deleted(memory)
+	rlpHashOneTimeInstance *mod.PackedCircuitInstance // just use to prove the first block, then should be deleted(memory)
 	//verifyInstance         pipeline.PackedCircuitInstance
 }
 
@@ -89,7 +102,7 @@ func (agg *Aggregator) RuntimeMode() config.NodeMode {
 }
 
 func (agg *Aggregator) loadOneTimeRlpInstance() error {
-	oneTimeInstance, err := pipeline.LoadFromInstanceConfig(agg.RlpHashInstance)
+	oneTimeInstance, err := mod.LoadFromInstanceConfig(agg.RlpHashInstance)
 	if err != nil {
 		return err
 	}

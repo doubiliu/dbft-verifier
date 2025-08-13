@@ -3,11 +3,11 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/txhsl/neox-dbft-verifier/plugin/pipeline"
+	"github.com/txhsl/neox-dbft-verifier/mod"
 	"os"
 )
 
-type InstanceConfig = pipeline.InstanceConfig
+type InstanceConfig = mod.InstanceConfig
 type NodeMode = int
 
 const (
