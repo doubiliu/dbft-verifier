@@ -1,4 +1,4 @@
-package workflow
+package neox
 
 import (
 	"errors"
@@ -9,13 +9,12 @@ import (
 // Task is a pending-request's actual processing
 type Task struct {
 	*BlockRequest
-	ce     circuit.CircuitEnum
+	//ce     circuit.CircuitEnum
 	params []any
 }
 
 func (task *Task) Witness() (witness.Witness, error) {
-	p := append([]any{task.ce}, task.params...)
-	return task.GetWitness(p...)
+	return task.GetWitness(task.params...)
 }
 
 func (task *Task) AddParams(p ...any) {

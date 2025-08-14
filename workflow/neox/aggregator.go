@@ -1,4 +1,4 @@
-package workflow
+package neox
 
 import (
 	"bytes"
@@ -11,9 +11,6 @@ import (
 	"github.com/consensys/gnark/backend/groth16"
 	groth16_bn254 "github.com/consensys/gnark/backend/groth16/bn254"
 	stdgroth16 "github.com/consensys/gnark/std/recursion/groth16"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
 	neox "github.com/txhsl/neox-dbft-verifier/circuit/neox"
@@ -162,23 +159,26 @@ func (agg *Aggregator) Start() error {
 // we append the block into headers map, each block waits for sub-circuit proofs
 func (agg *Aggregator) processDistributeRequest() {
 	for request := range agg.DistributeChannel() {
-		header := new(types.Header)
+		header := new(neox.NeoxBlockHeader)
 		err := header.UnmarshalJSON(request.Header)
 		if err != nil {
 			agg.feedback <- err
 			continue
 		}
-		edata, err := circuit.EncodeHeader(header, false)
+
+		// get proofs
+		// compute hash,
+		blockHash, err := header.Hash()
 		if err != nil {
 			agg.feedback <- err
+			continue
 		}
-		blockHash := common.BytesToHash(crypto.Keccak256(edata)).Bytes()
 		if _, exist := agg.headers[hex.EncodeToString(blockHash)]; exist {
 			// todo Repeatedly sending blocks
 			continue
 		}
 		agg.headers[hex.EncodeToString(blockHash)] = NewPackedBlockHeader(header)
-		fmt.Printf("Receive a new block, block height: %d, block hash: %v\n", header.Number.Uint64(), blockHash)
+		fmt.Printf("Receive a new block, block height: %d, block hash: %v\n", header.Number(), blockHash)
 		if request.IsReliable {
 			go func() {
 				if err = agg.computeFirstBlockRlpHash(header, hex.EncodeToString(blockHash)); err != nil {
@@ -189,15 +189,15 @@ func (agg *Aggregator) processDistributeRequest() {
 	}
 
 }
-func (agg *Aggregator) computeFirstBlockRlpHash(header *types.Header, blockHash string) error {
+func (agg *Aggregator) computeFirstBlockRlpHash(header *neox.NeoxBlockHeader, blockHash string) error {
 	fmt.Println("Start computing the first block rlpHash proof")
 	blockRequest := BlockRequest{
 		blockHeader: header,
-		isInner:     true,
+		ce:          circuit.RlpHash,
 		startTime:   time.Now(),
 	}
 
-	rlpHashTask := Task{&blockRequest, circuit.RlpHash, make([]any, 0)}
+	rlpHashTask := Task{&blockRequest, make([]any, 0)}
 	rlpWitness, err := rlpHashTask.Witness()
 	proof, err := groth16.Prove(agg.rlpHashOneTimeInstance.Ccs, agg.rlpHashOneTimeInstance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
 	if err != nil {
@@ -235,7 +235,12 @@ func (agg *Aggregator) processAggregateRequest() {
 			agg.feedback <- err
 			continue
 		}
-		fmt.Printf("Receive a Aggregate request, block hash: %v, block height: %d, circuit: %d\n", blockHash, pb.header.Number.Uint64(), request.Circuit)
+		current, ok := pb.header.(*neox.NeoxBlockHeader)
+		if !ok {
+			agg.feedback <- errors.New("invalid block type")
+			continue
+		}
+		fmt.Printf("Receive a Aggregate request, block hash: %v, block height: %d, circuit: %d\n", blockHash, current.Number(), request.Circuit)
 		switch circuit.CircuitEnum(request.Circuit) {
 		case circuit.RlpHash:
 			if pb.currentRlpHashProof == nil {
@@ -256,7 +261,6 @@ func (agg *Aggregator) processAggregateRequest() {
 			continue
 		}
 		// check can be verified
-		current := pb.header
 		parentHash := hex.EncodeToString(current.ParentHash[:])
 		parentPb, exist := agg.headers[parentHash]
 		if !exist {
@@ -273,10 +277,9 @@ func (agg *Aggregator) processAggregateRequest() {
 		task := Task{
 			BlockRequest: &BlockRequest{
 				blockHeader: current,
-				isInner:     false,
+				ce:          circuit.NeoxOuter,
 				startTime:   time.Now(),
 			},
-			ce: circuit.OuterAgg,
 		}
 		go func() { agg.tasks <- task }()
 	}
@@ -285,7 +288,7 @@ func (agg *Aggregator) processAggregateRequest() {
 func (agg *Aggregator) runInPipeline() error {
 	fmt.Println("aggregator starts in pipeline mode")
 	instanceConfig := map[circuit.CircuitEnum]pipeline.InstanceConfig{
-		circuit.OuterAgg: agg.OuterAggInstance,
+		circuit.NeoxOuter: agg.NeoxOuterInstance,
 	}
 	scheduler, err := pipeline.NewPipelineScheduler(agg.NbSolve, agg.NbProve, 100, instanceConfig)
 	if err != nil {
@@ -296,15 +299,19 @@ func (agg *Aggregator) runInPipeline() error {
 
 	go func() {
 		for task := range agg.tasks {
-			header := task.blockHeader
+			header, ok := task.blockHeader.(*neox.NeoxBlockHeader)
+			if !ok {
+				agg.feedback <- errors.New("invalid header type")
+				continue
+			}
 			// get proofs
 			// compute hash,
-			edata, err := circuit.EncodeHeader(header, false)
+			blockHash, err := header.Hash()
 			if err != nil {
 				agg.feedback <- err
+				continue
 			}
-			blockHash := common.BytesToHash(crypto.Keccak256(edata)).Bytes()
-			fmt.Printf("Start prove a aggregate circuit, block hash: %v, block height: %d\n", blockHash, header.Number.Uint64())
+			fmt.Printf("Start prove a aggregate circuit, block hash: %v, block height: %d\n", blockHash, header.Number())
 
 			currentPb, _ := agg.headers[hex.EncodeToString(blockHash)] // no need to check, since before the task is created, headers[hashString] has been checked
 			rlpHashProof, nextProof, err := currentPb.Proofs()
@@ -320,14 +327,18 @@ func (agg *Aggregator) runInPipeline() error {
 	}()
 	go func() {
 		for response := range scheduler.Response {
-			header := response.Request.(*Task).blockHeader
-			edata, err := circuit.EncodeHeader(header, false) // todo can this pre-compute or re-used?
+			header, ok := response.Request.(*Task).blockHeader.(*neox.NeoxBlockHeader)
+			if !ok {
+				agg.feedback <- errors.New("invalid header type")
+				continue
+			}
+			blockHash, err := header.Hash()
 			if err != nil {
 				agg.feedback <- err
+				continue
 			}
-			blockHash := common.BytesToHash(crypto.Keccak256(edata)).Bytes()
 
-			fmt.Printf("finish outer aggregate proof, block height: %d, block hash: %v, proof: %v\n", header.Number.Uint64(), blockHash, response.Proof)
+			fmt.Printf("finish outer aggregate proof, block height: %d, block hash: %v, proof: %v\n", header.Number(), blockHash, response.Proof)
 		}
 	}()
 	go func() {
@@ -340,7 +351,7 @@ func (agg *Aggregator) runInPipeline() error {
 
 func (agg *Aggregator) runInSerial() error {
 	// load verify instance
-	instance, err := pipeline.LoadFromInstanceConfig(agg.OuterAggInstance)
+	instance, err := mod.LoadFromInstanceConfig(agg.NeoxOuterInstance)
 	if err != nil {
 		return err
 	}
@@ -349,15 +360,19 @@ func (agg *Aggregator) runInSerial() error {
 	go func() {
 		for task := range agg.tasks {
 
-			header := task.blockHeader
+			header, ok := task.blockHeader.(*neox.NeoxBlockHeader)
+			if !ok {
+				agg.feedback <- errors.New("invalid header type")
+				continue
+			}
 			// get proofs
 			// compute hash,
-			edata, err := circuit.EncodeHeader(header, false)
+			blockHash, err := header.Hash()
 			if err != nil {
 				agg.feedback <- err
+				continue
 			}
-			blockHash := common.BytesToHash(crypto.Keccak256(edata)).Bytes()
-			fmt.Printf("Start prove a aggregate circuit, block hash: %v, block height: %d\n", blockHash, header.Number.Uint64())
+			fmt.Printf("Start prove a aggregate circuit, block hash: %v, block height: %d\n", blockHash, header.Number())
 
 			currentPb, _ := agg.headers[hex.EncodeToString(blockHash)] // no need to check, since before the task is created, headers[hashString] has been checked
 			rlpHashProof, nextProof, err := currentPb.Proofs()
@@ -378,7 +393,7 @@ func (agg *Aggregator) runInSerial() error {
 			if err != nil {
 				agg.feedback <- err
 			}
-			fmt.Printf("finish outer aggregate proof, block height: %d, block hash: %v, proof: %v\n", header.Number.Uint64(), blockHash, proof)
+			fmt.Printf("finish outer aggregate proof, block height: %d, block hash: %v, proof: %v\n", header.Number(), blockHash, proof)
 
 		}
 	}()

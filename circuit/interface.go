@@ -19,8 +19,11 @@ func (ce CircuitEnum) IsNeox() bool {
 		return false
 	}
 }
+func (ce CircuitEnum) IsInner() bool {
+	return ce == RlpHash || ce == ToG2Hash || ce == NoSigRlp
+}
 func (ce CircuitEnum) IsInvalid() bool {
-	return ce == Invalid
+	return ce >= Invalid || ce < RlpHash
 }
 
 type HashableBlockHeader interface {
@@ -28,4 +31,5 @@ type HashableBlockHeader interface {
 	Hash(...any) ([]byte, error)
 	UnmarshalJSON([]byte) error
 	MarshalJSON() ([]byte, error)
+	Number() uint64
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/txhsl/neox-dbft-verifier/circuit"
 	"github.com/txhsl/neox-dbft-verifier/config"
 	"github.com/txhsl/neox-dbft-verifier/service/pb/distribute"
 	"google.golang.org/grpc"
@@ -63,7 +63,7 @@ func NewDistributeClient(config config.ServiceConfig) *DistributeClient {
 	}
 }
 
-func (dc *DistributeClient) DistributeBlock(block *types.Header, isFirstBlock bool) error {
+func (dc *DistributeClient) DistributeBlock(block circuit.HashableBlockHeader, isFirstBlock bool) error {
 	header, err := block.MarshalJSON()
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func (dc *DistributeClient) DistributeBlock(block *types.Header, isFirstBlock bo
 		if !response.Success {
 			return errors.New("send Block Failed, response not have a success")
 		}
-		fmt.Printf("Send Block %d to worker %d successfully\n", block.Number.Uint64(), nodeID)
+		fmt.Printf("Send Block %d to worker %d successfully\n", block.Number(), nodeID)
 		return conn.Close()
 	}
 	// aggregator should have the block header to compute public witness
@@ -109,7 +109,7 @@ func (dc *DistributeClient) DistributeBlock(block *types.Header, isFirstBlock bo
 		if !response.Success {
 			return errors.New("send Block Failed, response not have a success")
 		}
-		fmt.Printf("Send Block %d to aggregator successfully\n", block.Number.Uint64())
+		fmt.Printf("Send Block %d to aggregator successfully\n", block.Number())
 		return conn.Close()
 	}
 	if err := distributeToWorker(); err != nil {
@@ -119,13 +119,13 @@ func (dc *DistributeClient) DistributeBlock(block *types.Header, isFirstBlock bo
 
 }
 
-func (dc *DistributeClient) alloc(block *types.Header, isAggragate bool) config.NodeID {
+func (dc *DistributeClient) alloc(block circuit.HashableBlockHeader, isAggragate bool) config.NodeID {
 	// todo
 	nbWorker := len(dc.config.Network.Workers)
 	nbAggregator := len(dc.config.Network.Aggregators)
 	if isAggragate {
-		return config.NodeID(block.Number.Uint64() % (uint64(nbAggregator)))
+		return config.NodeID(block.Number() % (uint64(nbAggregator)))
 	} else {
-		return nbAggregator + config.NodeID(block.Number.Uint64()%(uint64(nbWorker)))
+		return nbAggregator + config.NodeID(block.Number()%(uint64(nbWorker)))
 	}
 }

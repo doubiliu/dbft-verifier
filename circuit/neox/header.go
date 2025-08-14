@@ -20,6 +20,9 @@ type NeoxBlockHeader struct {
 func NewNeoxBlockHeader(header *types.Header) *NeoxBlockHeader {
 	return &NeoxBlockHeader{header}
 }
+func (header *NeoxBlockHeader) Number() uint64 {
+	return header.Header.Number.Uint64()
+}
 func (header *NeoxBlockHeader) Encode(params ...any) ([]byte, error) {
 	if len(params) != 0 {
 		isNoSig, ok := params[0].(bool)
@@ -68,7 +71,7 @@ func (header *NeoxBlockHeader) ToHeaderParameter() (HeaderParameters, error) {
 	if err != nil {
 		return HeaderParameters{}, err
 	}
-	number, err := IntToFilledLengthBytes(header.Number.Uint64())
+	number, err := IntToFilledLengthBytes(header.Number())
 	if err != nil {
 		return HeaderParameters{}, err
 	}
@@ -165,7 +168,7 @@ func (header *NeoxBlockHeader) ToCompressedHeaderParameters() (CompressHeaderPar
 		ReceiptHash:      compressHashBytes(header.ReceiptHash),
 		Bloom:            compressBytes(header.Bloom[:]),
 		Difficulty:       compressU64(header.Difficulty.Uint64()),
-		Number:           compressU64(header.Number.Uint64()),
+		Number:           compressU64(header.Number()),
 		GasLimit:         compressU64(header.GasLimit),
 		GasUsed:          compressU64(header.GasUsed),
 		Time:             compressU64(header.Time),

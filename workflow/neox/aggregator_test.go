@@ -1,4 +1,4 @@
-package workflow
+package neox
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 
 func TestAggregatorWorkflow(t *testing.T) {
 	aggregator := new(Aggregator)
-	err := aggregator.FromJson("../cmd/workflow/configs/172.23.166.111/config_node_0.json", true)
+	err := aggregator.FromJson("../cmd/workflow/configs/172.23.166.111/config_node_0.json")
 	if err != nil {
 		panic(err)
 	}

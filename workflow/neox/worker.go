@@ -1,4 +1,4 @@
-package workflow
+package neox
 
 import (
 	"context"
@@ -7,9 +7,10 @@ import (
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend/groth16"
 	stdgroth16 "github.com/consensys/gnark/std/recursion/groth16"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
+	neox "github.com/txhsl/neox-dbft-verifier/circuit/neox"
 	"github.com/txhsl/neox-dbft-verifier/config"
+	"github.com/txhsl/neox-dbft-verifier/mod"
 	"github.com/txhsl/neox-dbft-verifier/plugin/pipeline"
 	"github.com/txhsl/neox-dbft-verifier/service"
 	"golang.org/x/sync/errgroup"
@@ -65,16 +66,16 @@ func (n *Worker) Start() error {
 	return err
 }
 func (n *Worker) rlpInstance() (pipeline.PackedCircuitInstance, error) {
-	return pipeline.LoadFromInstanceConfig(n.RlpHashInstance)
+	return mod.LoadFromInstanceConfig(n.RlpHashInstance)
 }
 
 func (n *Worker) nextInstance() (pipeline.PackedCircuitInstance, error) {
 	switch n.ExtraVersion {
-	case circuit.ExtraV0:
+	case neox.ExtraV0:
 
-		return pipeline.LoadFromInstanceConfig(n.NoSigRlpInstance)
-	case circuit.ExtraV1, circuit.ExtraV2:
-		return pipeline.LoadFromInstanceConfig(n.ToG2HashInstance)
+		return mod.LoadFromInstanceConfig(n.NoSigRlpInstance)
+	case neox.ExtraV1, neox.ExtraV2:
+		return mod.LoadFromInstanceConfig(n.ToG2HashInstance)
 	default:
 		return pipeline.PackedCircuitInstance{}, errors.New("invalid version")
 	}
@@ -88,11 +89,11 @@ func (n *Worker) rlpInstanceConfig() (map[circuit.CircuitEnum]config.InstanceCon
 
 func (n *Worker) nextInstanceConfig() (map[circuit.CircuitEnum]config.InstanceConfig, error) {
 	switch n.ExtraVersion {
-	case circuit.ExtraV0:
+	case neox.ExtraV0:
 		return map[circuit.CircuitEnum]config.InstanceConfig{
 			circuit.NoSigRlp: n.NoSigRlpInstance,
 		}, nil
-	case circuit.ExtraV1, circuit.ExtraV2:
+	case neox.ExtraV1, neox.ExtraV2:
 		return map[circuit.CircuitEnum]config.InstanceConfig{
 			circuit.ToG2Hash: n.ToG2HashInstance,
 		}, nil
@@ -107,9 +108,9 @@ func (n *Worker) instanceConfig() (map[circuit.CircuitEnum]config.InstanceConfig
 	config := make(map[circuit.CircuitEnum]config.InstanceConfig)
 	config[circuit.RlpHash] = n.RlpHashInstance
 	switch n.ExtraVersion {
-	case circuit.ExtraV0:
+	case neox.ExtraV0:
 		config[circuit.NoSigRlp] = n.NoSigRlpInstance
-	case circuit.ExtraV1, circuit.ExtraV2:
+	case neox.ExtraV1, neox.ExtraV2:
 		config[circuit.ToG2Hash] = n.ToG2HashInstance
 	default:
 		return nil, errors.New("invalid node version")
@@ -134,18 +135,18 @@ func (n *Worker) runInSerial() error {
 				fmt.Println("first block need not to be proved in worker, ignore it")
 				continue
 			}
-			header := new(types.Header)
+			header := new(neox.NeoxBlockHeader)
 			err := header.UnmarshalJSON(request.Header)
 			if err != nil {
 				n.feedback <- err
 			}
-			fmt.Printf("receive block distribute request, block height: %d\n", header.Number.Uint64())
+			fmt.Printf("receive block distribute request, block height: %d\n", header.Number())
 			blockRequest := BlockRequest{
 				blockHeader: header,
-				isInner:     true,
+				ce:          circuit.RlpHash,
 				startTime:   time.Now(),
 			}
-			rlpHashTask := Task{&blockRequest, circuit.RlpHash, make([]any, 0)}
+			rlpHashTask := Task{&blockRequest, make([]any, 0)}
 			rlpWitness, err := rlpHashTask.Witness()
 			if err != nil {
 				n.feedback <- err
@@ -154,11 +155,11 @@ func (n *Worker) runInSerial() error {
 
 			proof, err := groth16.Prove(rlpInstance.Ccs, rlpInstance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
 			if err != nil {
-				fmt.Println("rlpHash prove error in block", header.Number.Uint64())
+				fmt.Println("rlpHash prove error in block", header.Number())
 				n.feedback <- err
 				continue
 			}
-			fmt.Printf("finish rlpHash proof, block height: %d\n", header.Number.Uint64())
+			fmt.Printf("finish rlpHash proof, block height: %d\n", header.Number())
 			//proveResponse := pipeline.NewProveResponse(&rlpHashTask, proof, circuit.RlpHash)
 			//n.tmp <- proveResponse
 			err = n.CommitProof(header, proof, circuit.RlpHash)
@@ -182,13 +183,13 @@ func (n *Worker) runInSerial() error {
 			}
 			nextProof, err := groth16.Prove(nextInstance.Ccs, nextInstance.Pk, nextWitness, blockRequest.Option()...)
 			if err != nil {
-				fmt.Println("next prove error in block", header.Number.Uint64())
+				fmt.Println("next prove error in block", header.Number())
 				n.feedback <- err
 				continue
 			}
 			//nextResponse := pipeline.NewProveResponse(&next, nextProof, next.ce)
 			err = n.CommitProof(header, nextProof, next.ce)
-			fmt.Printf("finish next proof, block height: %d\n", header.Number.Uint64())
+			fmt.Printf("finish next proof, block height: %d\n", header.Number())
 
 		}
 	}()
@@ -221,18 +222,18 @@ func (n *Worker) runInPipeline() error {
 				fmt.Println("first block need not to be proved in worker, ignore it")
 				continue
 			}
-			header := new(types.Header)
+			header := new(neox.NeoxBlockHeader)
 			err := header.UnmarshalJSON(request.Header)
 			if err != nil {
 				n.feedback <- err
 			}
-			fmt.Printf("receive block distribute request, block height: %d\n", header.Number.Uint64())
+			fmt.Printf("receive block distribute request, block height: %d\n", header.Number())
 			blockRequest := BlockRequest{
 				blockHeader: header,
-				isInner:     true,
+				ce:          circuit.RlpHash,
 				startTime:   time.Now(),
 			}
-			task := Task{&blockRequest, circuit.RlpHash, make([]any, 0)}
+			task := Task{&blockRequest, make([]any, 0)}
 			n.tasks <- task                    // tasks is used for serial running
 			next, isFinish, err := task.Next() // can pipeline
 			if err != nil {
@@ -258,8 +259,8 @@ func (n *Worker) runInPipeline() error {
 	//}()
 	go func() {
 		for response := range nextScheduler.Response {
-			fmt.Printf("finish next proof, circuit: %d, block height: %d\n", response.CircuitType, response.Request.(*Task).blockHeader.Number.Uint64())
-			err = n.CommitProof(response.Request.(*Task).blockHeader, response.Proof, response.CircuitEnum())
+			fmt.Printf("finish next proof, circuit: %d, block height: %d\n", response.CircuitType, response.Request.(*Task).blockHeader.Number())
+			err = n.CommitProof(response.Request.(*Task).blockHeader.(*neox.NeoxBlockHeader), response.Proof, response.CircuitEnum())
 			if err != nil {
 				n.feedback <- err
 			}
@@ -295,14 +296,14 @@ func (n *Worker) runInPipeline() error {
 
 			proof, err := groth16.Prove(rlpInstance.Ccs, rlpInstance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
 			if err != nil {
-				fmt.Println("rlpHash prove error in block", task.blockHeader.Number.Uint64())
+				fmt.Println("rlpHash prove error in block", task.blockHeader.Number())
 				n.feedback <- err
 				continue
 			}
-			fmt.Printf("finish rlpHash proof, block height: %d\n", task.blockHeader.Number.Uint64())
+			fmt.Printf("finish rlpHash proof, block height: %d\n", task.blockHeader.Number())
 			//proveResponse := pipeline.NewProveResponse(&rlpHashTask, proof, circuit.RlpHash)
 			//n.tmp <- proveResponse
-			err = n.CommitProof(task.blockHeader, proof, circuit.RlpHash)
+			err = n.CommitProof(task.blockHeader.(*neox.NeoxBlockHeader), proof, circuit.RlpHash)
 			if err != nil {
 				n.feedback <- err
 				continue
@@ -313,11 +314,6 @@ func (n *Worker) runInPipeline() error {
 }
 
 func (n *Worker) FromCommonConfig(cc config.CommonConfig, params ...any) error {
-	//var err error
-	//n.CommonConfig, err = config.LoadConfigFromJson(jsonPath)
-	//if err != nil {
-	//	return err
-	//}
 	n.CommonConfig = cc
 	n.feedback = make(chan error, 100) // todo
 	n.AggregateClient = *service.NewAggregateClient(n.ServiceConfig)

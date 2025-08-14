@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
+	neox "github.com/txhsl/neox-dbft-verifier/circuit/neox"
 	"github.com/txhsl/neox-dbft-verifier/config"
 	"github.com/txhsl/neox-dbft-verifier/service"
 	"math/big"
@@ -13,12 +14,14 @@ import (
 )
 
 // BlockManager gets the blocks and send block to inner Worker Node
+// BlockManager can be run in both n3/neox
 type BlockManager struct {
 	config   *config.ServiceConfig
 	client   *ethclient.Client
 	stopCh   chan struct{}
 	feedback chan error
 	service.DistributeClient
+	isNeox bool // if is neox, block is NeoxBlockHeader, else is N3BlockHeader
 }
 
 func NewBlockManager(cfg config.ServiceConfig) *BlockManager {
@@ -51,7 +54,7 @@ func (manager *BlockManager) Start() error {
 	time.Sleep(5 * time.Second) // todo
 	go func() {
 		for {
-			err = manager.DistributeBlock(firstBlockHeader, true) // we simply send it to all nodes(workers and aggregator, workers will ignore it)
+			err = manager.DistributeBlock(neox.NewNeoxBlockHeader(firstBlockHeader), true) // we simply send it to all nodes(workers and aggregator, workers will ignore it)
 			if err != nil {
 				manager.feedback <- err
 			} else {
@@ -93,7 +96,7 @@ func (manager *BlockManager) fetchBlock(blockNumber uint64) error {
 	if err != nil {
 		return err
 	}
-	return manager.DistributeBlock(header, false)
+	return manager.DistributeBlock(neox.NewNeoxBlockHeader(header), false)
 
 }
 func (manager *BlockManager) Stop() {

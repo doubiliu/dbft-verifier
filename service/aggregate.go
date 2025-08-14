@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"github.com/consensys/gnark/backend/groth16"
 	groth16_bn254 "github.com/consensys/gnark/backend/groth16/bn254"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
+	neox "github.com/txhsl/neox-dbft-verifier/circuit/neox"
 	"github.com/txhsl/neox-dbft-verifier/config"
 	"github.com/txhsl/neox-dbft-verifier/service/pb/aggregate"
 	"google.golang.org/grpc"
@@ -71,7 +69,7 @@ func NewAggregateClient(config config.ServiceConfig) *AggregateClient {
 	}
 }
 
-func (ac *AggregateClient) CommitProof(block *types.Header, proof groth16.Proof, ce circuit.CircuitEnum) error {
+func (ac *AggregateClient) CommitProof(block *neox.NeoxBlockHeader, proof groth16.Proof, ce circuit.CircuitEnum) error {
 	conn, err := grpc.NewClient(ac.ServerURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
@@ -80,10 +78,11 @@ func (ac *AggregateClient) CommitProof(block *types.Header, proof groth16.Proof,
 	defer cancel()
 	client := aggregate.NewAggregateServiceClient(conn)
 	// we compute rlpHash here in avoid to modify the params
-	edata, err := circuit.EncodeHeader(block, false)
+	blockHash, err := block.Hash()
 	if err != nil {
-		panic(err)
+		return err
 	}
+
 	buf := bytes.NewBuffer([]byte{})
 	_, err = proof.(*groth16_bn254.Proof).WriteTo(buf)
 	if err != nil {
@@ -91,7 +90,7 @@ func (ac *AggregateClient) CommitProof(block *types.Header, proof groth16.Proof,
 	}
 
 	request := &aggregate.AggregateRequest{
-		BlockHash: common.BytesToHash(crypto.Keccak256(edata)).Bytes(),
+		BlockHash: blockHash,
 		Proof:     buf.Bytes(), // todo read
 		Circuit:   int32(ce),
 	}
