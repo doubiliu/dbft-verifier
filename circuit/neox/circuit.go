@@ -17,106 +17,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
-	"github.com/txhsl/neox-dbft-verifier/helper"
-	"github.com/txhsl/neox-dbft-verifier/mod"
 	"golang.org/x/crypto/sha3"
 	"math/big"
 	"slices"
 )
-
-type CircuitEnum = int
-
-const (
-	RlpHash CircuitEnum = iota
-	NoSigRlp
-	ToG2Hash
-	OuterAgg
-	Invalid
-)
-
-func GetSubCircuitWrapper(e CircuitEnum, extraVersion byte) (frontend.Circuit, error) {
-	switch e {
-	case RlpHash:
-		return new(HeaderRLPEncodeVerifyWrapper).Circuit(
-			func() (circuit.HashableBlockHeader, error) {
-				header, _ := HeaderTestData(extraVersion)
-				return NewNeoxBlockHeader(header), nil
-			}, false)
-	case NoSigRlp:
-		return new(HeaderRLPEncodeVerifyWrapper).Circuit(
-			func() (circuit.HashableBlockHeader, error) {
-				header, _ := HeaderTestData(extraVersion)
-				return NewNeoxBlockHeader(header), nil
-			}, true)
-	case ToG2Hash:
-		return new(HeaderHashToG2VerifyWrapper).Circuit(
-			func() (circuit.HashableBlockHeader, error) {
-				header, _ := HeaderTestData(extraVersion) // v1 and v2 is same
-				return NewNeoxBlockHeader(header), nil
-			})
-		// todo Verify
-	default:
-		return nil, fmt.Errorf("unsupported circuit type: %v", e)
-	}
-}
-func TestSubCircuitSetup(e CircuitEnum, extraVersion byte, export bool, instanceConfig mod.InstanceConfig) error {
-	var ct, assignment frontend.Circuit
-	var err error
-	switch e {
-	case RlpHash:
-		ct, err = new(HeaderRLPEncodeVerifyWrapper).Circuit(
-			func() (circuit.HashableBlockHeader, error) {
-				header, _ := HeaderTestData(extraVersion)
-				return NewNeoxBlockHeader(header), nil
-			}, false)
-		assignment, err = new(HeaderRLPEncodeVerifyWrapper).Assignment(
-			func() (circuit.HashableBlockHeader, error) {
-				header, _ := HeaderTestData(extraVersion)
-				return NewNeoxBlockHeader(header), nil
-			}, false)
-		if err != nil {
-			return err
-		}
-	case NoSigRlp:
-		ct, err = new(HeaderRLPEncodeVerifyWrapper).Circuit(
-			func() (circuit.HashableBlockHeader, error) {
-				header, _ := HeaderTestData(extraVersion)
-				return NewNeoxBlockHeader(header), nil
-			}, true)
-		assignment, err = new(HeaderRLPEncodeVerifyWrapper).Assignment(
-			func() (circuit.HashableBlockHeader, error) {
-				header, _ := HeaderTestData(extraVersion)
-				return NewNeoxBlockHeader(header), nil
-			}, true)
-		if err != nil {
-			return err
-		}
-	case ToG2Hash:
-		ct, err = new(HeaderHashToG2VerifyWrapper).Circuit(
-			func() (circuit.HashableBlockHeader, error) {
-				header, _ := HeaderTestData(extraVersion)
-				return NewNeoxBlockHeader(header), nil
-			})
-		assignment, err = new(HeaderHashToG2VerifyWrapper).Assignment(
-			func() (circuit.HashableBlockHeader, error) {
-				header, _ := HeaderTestData(extraVersion)
-				return NewNeoxBlockHeader(header), nil
-			})
-		if err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("unsupported circuit type: %v", e)
-	}
-	ccs, pk, vk, err := helper.TrustedLocalSetup(ct, assignment)
-	if err != nil {
-		return err
-	}
-	if !export {
-		return nil
-	}
-	return ExportCircuitInstance(mod.PackedCircuitInstance{Ccs: ccs, Pk: pk, Vk: vk}, instanceConfig)
-}
 
 // HeaderRLPEncodeVerifyWrapper is used in V0/V1/V2, generate a proof of rlpHash(header)
 // we use header.NoSigHeader() to get a NoSigHeaderRLPEncodeVerifyWrapper which is used in V0, generates a proof of rlpHash(NoSigHeader)

@@ -82,7 +82,7 @@ func TestVerifyHeaderV0(t *testing.T) {
 	//assert.NoError(t, err)
 	ccs, pk, vk, err := helper.TrustedLocalSetup(ct, assignment)
 	assert.NoError(t, err)
-	assert.NoError(t, ExportCircuitInstance(mod.PackedCircuitInstance{Ccs: ccs, Pk: pk, Vk: vk}, verifierInstanceConfig))
+	assert.NoError(t, mod.ExportCircuitInstance(mod.PackedCircuitInstance{Ccs: ccs, Pk: pk, Vk: vk}, verifierInstanceConfig))
 }
 
 func TestVerifyHeaderV1OrV2(t *testing.T) {

@@ -13,6 +13,14 @@ import (
 	"math/big"
 )
 
+func GetN3VerifierHeaderWrapper() (frontend.Circuit, error) {
+	network, parent, current := HeaderTestData()
+	return new(N3VerifyHeaderWrapper).Circuit(
+		func() ([]circuit.HashableBlockHeader, error) {
+			return []circuit.HashableBlockHeader{NewN3BlockHeader(parent), NewN3BlockHeader(current)}, nil
+		}, network)
+}
+
 type N3VerifyHeaderWrapper struct {
 	Parent       HeaderParameters
 	Current      HeaderParameters

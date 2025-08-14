@@ -7,6 +7,7 @@ import (
 	"github.com/consensys/gnark/test"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/txhsl/neox-dbft-verifier/circuit"
 	"github.com/txhsl/neox-dbft-verifier/mod"
 	"testing"
 )
@@ -136,7 +137,7 @@ func TestRLPEncodeVerifyCircuit(t *testing.T) {
 		PkPath:  fmt.Sprintf("../../cmd/meta/test/%s/rlp_encode_hash_extra_%s_test.pk", version, version),
 		VkPath:  fmt.Sprintf("../../cmd/meta/test/%s/rlp_encode_hash_extra_%s_test.vk", version, version),
 	}
-	err := TestSubCircuitSetup(RlpHash, extraVersion, true, instanceConfig)
+	err := TestSubCircuitSetup(circuit.RlpHash, extraVersion, true, instanceConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -148,7 +149,7 @@ func TestNoSigHeaderRLPEncodeCircuit(t *testing.T) {
 		PkPath:  "../../cmd/meta/test/v0/rlp_encode_noSig_hash_extra_v0_test.pk",
 		VkPath:  "../../cmd/meta/test/v0/rlp_encode_noSig_hash_extra_v0_test.vk",
 	}
-	err := TestSubCircuitSetup(NoSigRlp, ExtraV0, true, instanceConfig)
+	err := TestSubCircuitSetup(circuit.NoSigRlp, ExtraV0, true, instanceConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -162,7 +163,7 @@ func TestHeaderHashToG2VerifyCircuit(t *testing.T) {
 		PkPath:  "../../cmd/meta/test/v1/to_g2_hash.pk",
 		VkPath:  "../../cmd/meta/test/v1/to_g2_hash.vk",
 	}
-	err := TestSubCircuitSetup(ToG2Hash, extraVersion, true, instanceConfig)
+	err := TestSubCircuitSetup(circuit.ToG2Hash, extraVersion, true, instanceConfig)
 	if err != nil {
 		panic(err)
 	}

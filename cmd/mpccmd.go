@@ -10,8 +10,9 @@ import (
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
+	"github.com/txhsl/neox-dbft-verifier/circuit/n3"
+	neox "github.com/txhsl/neox-dbft-verifier/circuit/neox"
 	"github.com/txhsl/neox-dbft-verifier/helper"
 	"github.com/txhsl/neox-dbft-verifier/mpc"
 	"github.com/urfave/cli/v2"
@@ -61,16 +62,16 @@ var (
 	}
 	circuitFlag = &cli.StringFlag{
 		Name:  "circuit",
-		Usage: "The type of circuit, [rlp, noSig, g2]",
+		Usage: "The type of circuit, [rlp, noSig, g2, n3]",
 		Value: "rlp",
 		Action: func(context *cli.Context, s string) error {
-			validCircuitFlags := []string{"rlp", "noSig", "g2"}
+			validCircuitFlags := []string{"rlp", "noSig", "g2", "n3"}
 			for _, v := range validCircuitFlags {
 				if v == s {
 					return nil
 				}
 			}
-			return fmt.Errorf(fmt.Sprintf("Invalid validCircuitFlags %s, expected: {rlp, noSig, g2}", s))
+			return fmt.Errorf(fmt.Sprintf("Invalid validCircuitFlags %s, expected: {rlp, noSig, g2, n3}", s))
 		},
 	}
 	// todo
@@ -113,25 +114,6 @@ var (
 func main() {
 	app := &cli.App{
 		Commands: []*cli.Command{
-			{
-				Name:  "compile", // we compile ccs first
-				Usage: "Compile constraint systems into .ccs file",
-				Description: `
-			Compile commands deal the generation of r1cs constraint system files,
-			should be performed before any ZK application deployed based on
-			this algorithm, and later can be used by any phase1 which needs
-			this MPC.`,
-				Subcommands: []*cli.Command{
-					{
-						Name: "sub",
-						Flags: []cli.Flag{
-							extraVersionFlag,
-						},
-						Action:      compileSubCircuit,
-						Description: "Compile Sub Circuits in current version into .ccs file, must be done before compile the verify circuit",
-					},
-				},
-			},
 			{
 				Name:  "phase1",
 				Usage: "Deal with MPC phase1",
@@ -318,73 +300,25 @@ func getCircuitEnum(c string) (circuit.CircuitEnum, error) {
 		return circuit.NoSigRlp, nil
 	case "g2":
 		return circuit.ToG2Hash, nil
+	case "n3":
+		return circuit.N3Verifier, nil
+	// todo neo, NeoxOuter is not need here
 	default:
 		return circuit.Invalid, fmt.Errorf("invalid c, expect: [rlp, noSig, g2]")
 	}
 }
-func getExtraVersion(e string) (byte, error) {
+func getNeoxExtraVersion(e string) (byte, error) {
 	switch e {
 	case "v0":
-		return circuit.ExtraV0, nil
+		return neox.ExtraV0, nil
 	case "v1":
-		return circuit.ExtraV1, nil
+		return neox.ExtraV1, nil
 	case "v2":
-		return circuit.ExtraV2, nil
+		return neox.ExtraV2, nil
 	default:
 		return 0, errors.New("invalid extraVersion")
 	}
 }
-
-func compileSubCircuit(ctx *cli.Context) error {
-	extraVersion := ctx.String(extraVersionFlag.Name)
-	v, err := getExtraVersion(extraVersion)
-	if err != nil {
-		return err
-	}
-	maxCircuitSize := 0
-	// rlpHash
-	rlpHashCircuit, err := circuit.GetSubCircuitWrapper(circuit.RlpHash, v)
-	if err != nil {
-		return err
-	}
-	rlpHashCcs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, rlpHashCircuit)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Compile RlpHash Circuit in extra version %s, NbContraints = %d\n", extraVersion, rlpHashCcs.GetNbConstraints())
-	maxCircuitSize = max(maxCircuitSize, rlpHashCcs.GetNbConstraints())
-	// g2 or noSig + verify
-	if v == circuit.ExtraV0 {
-		// noSig
-		noSigRlpHashCircuit, err := circuit.GetSubCircuitWrapper(circuit.RlpHash, v)
-		if err != nil {
-			return err
-		}
-		noSigRlpHashCcs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, noSigRlpHashCircuit)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Compile NoSigRlpHash Circuit in extra version %s, NbConstraints = %d\n", extraVersion, noSigRlpHashCcs.GetNbConstraints())
-		maxCircuitSize = max(maxCircuitSize, noSigRlpHashCcs.GetNbConstraints())
-	} else {
-		// g2hash
-		g2HashCircuit, err := circuit.GetSubCircuitWrapper(circuit.ToG2Hash, v)
-		if err != nil {
-			return err
-		}
-		g2HashCcs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, g2HashCircuit)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Compile ToG2Hash Circuit in extra version %s, NbConstraints = %d\n", extraVersion, g2HashCcs.GetNbConstraints())
-		maxCircuitSize = max(maxCircuitSize, g2HashCcs.GetNbConstraints())
-	}
-	fmt.Printf("Compile finished, max ccs size: %d\n", maxCircuitSize)
-	fmt.Printf("Recommend Domain Size: %d\n", int(math.Ceil(math.Log2(float64(ecc.NextPowerOfTwo(uint64(maxCircuitSize)))))))
-	return nil
-
-}
-
 func sealCircuit(ctx *cli.Context) error {
 	srsFilePath := ctx.Path(srsFileFlag.Name)
 	if srsFilePath == "" {
@@ -443,15 +377,6 @@ func initInnerCircuitPhase2(ctx *cli.Context) error {
 		return errors.New("invalid phase1 SRS file path")
 	}
 	cf := ctx.String(circuitFlag.Name)
-	ce, err := getCircuitEnum(cf)
-	if err != nil {
-		return err
-	}
-	extraVersion := ctx.String(extraVersionFlag.Name)
-	v, err := getExtraVersion(extraVersion)
-	if err != nil {
-		return err
-	}
 	outputFileName := ctx.Path(outputFileFlag.Name)
 	if outputFileName == "" {
 		outputFileName = "init.phase2"
@@ -460,7 +385,31 @@ func initInnerCircuitPhase2(ctx *cli.Context) error {
 	if ccsPath == "" {
 		return errors.New("invalid ccsFile path")
 	}
-	c, err := circuit.GetSubCircuitWrapper(ce, v)
+	ce, err := getCircuitEnum(cf)
+	if err != nil {
+		return err
+	}
+	if ce.IsInvalid() {
+		return errors.New("invalid circuit enum")
+	}
+	var c frontend.Circuit
+	if ce.IsNeox() {
+		extraVersion := ctx.String(extraVersionFlag.Name)
+		v, err := getNeoxExtraVersion(extraVersion)
+		if err != nil {
+			return err
+		}
+		c, err = neox.GetSubCircuitWrapper(ce, v)
+		if err != nil {
+			return err
+		}
+	} else {
+		// n3
+		c, err = n3.GetN3VerifierHeaderWrapper()
+		if err != nil {
+			return err
+		}
+	}
 	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, c)
 	if err != nil {
 		return err
@@ -483,7 +432,7 @@ func initOuterCircuitPhase2(ctx *cli.Context) error {
 		return errors.New("invalid phase1 SRS file path")
 	}
 	extraVersion := ctx.String(extraVersionFlag.Name)
-	v, err := getExtraVersion(extraVersion)
+	v, err := getNeoxExtraVersion(extraVersion)
 	if err != nil {
 		return err
 	}
@@ -523,20 +472,9 @@ func initOuterCircuitPhase2(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	var c frontend.Circuit
-	switch v {
-	case circuit.ExtraV0:
-		c, err = circuit.GetExtraV0VerifierCircuit(func() (*types.Header, *types.Header, error) {
-			parent, current := circuit.HeaderTestData(circuit.ExtraV0)
-			return parent, current, nil
-		}, ccs1, ccs2, vk1, vk2)
-	case circuit.ExtraV1, circuit.ExtraV2:
-		c, err = circuit.GetExtraV1OrV2VerifierCircuit(v, func(extraVersion byte) (*types.Header, *types.Header, error) {
-			parent, current := circuit.HeaderTestData(extraVersion)
-			return parent, current, nil
-		}, ccs1, ccs2, vk1, vk2)
-	default:
-		return errors.New("invalid extraVersion")
+	c, err := neox.GetOuterAggregator(v, ccs1, ccs2, vk1, vk2)
+	if err != nil {
+		return err
 	}
 	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, c)
 	if err != nil {
