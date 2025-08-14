@@ -36,8 +36,8 @@ type PackedBlockHeader struct {
 
 func (pb *PackedBlockHeader) CanBeVerify() bool {
 	switch pb.header.(type) {
-	case *neox.EthBlockHeader:
-		h := pb.header.(*neox.EthBlockHeader)
+	case *neox.NeoxBlockHeader:
+		h := pb.header.(*neox.NeoxBlockHeader)
 		switch h.ExtraVersion() {
 		case neox.ExtraV0:
 			return pb.header != nil && pb.currentRlpHashProof != nil && pb.noSigHashProof != nil
@@ -57,8 +57,8 @@ func (pb *PackedBlockHeader) Proofs() (groth16.Proof, groth16.Proof, error) {
 		return nil, nil, errors.New("can't be verify")
 	}
 	switch pb.header.(type) {
-	case *neox.EthBlockHeader:
-		h := pb.header.(*neox.EthBlockHeader)
+	case *neox.NeoxBlockHeader:
+		h := pb.header.(*neox.NeoxBlockHeader)
 		switch h.ExtraVersion() {
 		case neox.ExtraV0:
 			return pb.currentRlpHashProof, pb.noSigHashProof, nil

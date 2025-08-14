@@ -103,6 +103,15 @@ func (hv *HeaderVerifier[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl]) VerifyV0(
 	sigVerifier := NewECDSASigVerifier[ECDSAFp, ECDSAFr](api)
 	// len(public keys) = len(addressIndices) = 5
 	api.AssertIsEqual(len(publicKeys), len(addressIndices))
+	// we need to check addressIndices is no repetition
+	for i := 0; i < len(addressIndices); i++ {
+		for j := 0; j < len(addressIndices); j++ {
+			if i == j {
+				continue
+			}
+			api.AssertIsDifferent(addressIndices[i], addressIndices[j])
+		}
+	}
 	for i := 0; i < len(addressIndices); i++ {
 		// we verify addrBytes[index]
 		api.AssertIsEqual(len(sigs[i]), 65)

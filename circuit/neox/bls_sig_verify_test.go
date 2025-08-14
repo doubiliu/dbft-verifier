@@ -16,7 +16,7 @@ import (
 
 func TestMultiSigVerifyCircuit(t *testing.T) {
 	assert := test.NewAssert(t)
-	header := new(EthBlockHeader)
+	header := new(NeoxBlockHeader)
 	err := header.UnmarshalJSON([]byte(
 		`{
     "baseFeePerGas": "0x4a817c800",

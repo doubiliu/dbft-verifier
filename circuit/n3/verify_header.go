@@ -1,4 +1,4 @@
-package circuit
+package n3
 
 import (
 	"github.com/consensys/gnark/frontend"
@@ -9,29 +9,8 @@ import (
 	"github.com/consensys/gnark/std/signature/ecdsa"
 )
 
-type VerifyHeaderWrapper struct {
-	Parent       HeaderParameters
-	Current      HeaderParameters
-	PubsPoint    []ecdsa.PublicKey[emulated.P256Fp, emulated.P256Fr]
-	MappingRules []frontend.Variable
-	Network      uints.U32  `gnark:",public"`
-	ParentHash   []uints.U8 `gnark:",public"`
-	CurrentHash  []uints.U8 `gnark:",public"`
-}
-
-// Define declares the circuit's constraints
-func (c *VerifyHeaderWrapper) Define(api frontend.API) error {
-	verify := NewHeaderVerifier(api)
-	verify.Verify(c.Parent, c.Current, c.ParentHash, c.CurrentHash, c.PubsPoint, c.MappingRules, c.Network)
-	return nil
-}
-
 type HeaderVerifier struct {
 	api frontend.API
-}
-
-func NewHeaderVerifier(api frontend.API) HeaderVerifier {
-	return HeaderVerifier{api: api}
 }
 
 func (hv *HeaderVerifier) Verify(parent, current HeaderParameters, parentHash []uints.U8, currentHash []uints.U8, pubsPoint []ecdsa.PublicKey[emulated.P256Fp, emulated.P256Fr], mappingRules []frontend.Variable, network uints.U32) {

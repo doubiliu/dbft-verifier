@@ -8,6 +8,7 @@ require (
 	github.com/consensys/gnark-crypto v0.18.0
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/ethereum/go-ethereum v1.16.2
+	github.com/nspcc-dev/neo-go v0.108.1
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v2 v2.27.7
@@ -42,7 +43,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/nspcc-dev/go-ordered-json v0.0.0-20240830112754-291b000d1f3b // indirect
-	github.com/nspcc-dev/neo-go v0.108.1 // indirect
 	github.com/nspcc-dev/neofs-api-go/v2 v2.14.1-0.20240827150555-5ce597aa14ea // indirect
 	github.com/nspcc-dev/neofs-sdk-go v1.0.0-rc.12.0.20241205083504-335d9fe90f24 // indirect
 	github.com/nspcc-dev/rfc6979 v0.2.3 // indirect

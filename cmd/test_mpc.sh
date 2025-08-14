@@ -1,5 +1,4 @@
-
-
+# neox
 # phase1
 go run mpccmd.go phase1 init --domain 26 --output ./meta/phase1/init.phase1
 go run mpccmd.go phase1 contribute --input ./meta/phase1/init.phase1 --output ./meta/phase1/contribute_1.phase1

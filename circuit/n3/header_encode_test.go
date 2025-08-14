@@ -1,4 +1,4 @@
-package circuit
+package n3
 
 import (
 	"fmt"
@@ -36,7 +36,8 @@ func TestHeaderEncoder(t *testing.T) {
 			"nextblockhash": "0xd0e2c5cd98d58eeb66c4f8413a798a75e4adaca7f1e8862bf6c3ad9d671ee6f5"
 		}`,
 	))
-	pheader, err := GetHeaderParamter(header)
+	h := NewN3BlockHeader(header)
+	pheader, err := h.ToHeaderParameter()
 	buf := io.NewBufBinWriter()
 	// No error can occur while encoding hashable fields.
 	EncodeHashableFields(*header, buf.BinWriter)

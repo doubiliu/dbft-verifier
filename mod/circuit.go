@@ -45,3 +45,16 @@ func LoadFromInstanceConfig(config InstanceConfig) (PackedCircuitInstance, error
 		Vk:  vk,
 	}, nil
 }
+
+func ExportCircuitInstance(instance PackedCircuitInstance, instanceConfig InstanceConfig) error {
+	if err := helper.ExportCCS(instance.Ccs, instanceConfig.CcsPath); err != nil {
+		return err
+	}
+	if err := helper.ExportProvingKey(instance.Pk, instanceConfig.PkPath); err != nil {
+		return err
+	}
+	if err := helper.ExportVerifyingKey(instance.Vk, instanceConfig.VkPath); err != nil {
+		return err
+	}
+	return nil
+}

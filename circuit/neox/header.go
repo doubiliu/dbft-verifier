@@ -13,14 +13,14 @@ import (
 	"slices"
 )
 
-type EthBlockHeader struct {
+type NeoxBlockHeader struct {
 	*types.Header
 }
 
-func NewEthBlockHeader(header *types.Header) *EthBlockHeader {
-	return &EthBlockHeader{header}
+func NewNeoxBlockHeader(header *types.Header) *NeoxBlockHeader {
+	return &NeoxBlockHeader{header}
 }
-func (header *EthBlockHeader) Encode(params ...any) ([]byte, error) {
+func (header *NeoxBlockHeader) Encode(params ...any) ([]byte, error) {
 	if len(params) != 0 {
 		isNoSig, ok := params[0].(bool)
 		if !ok {
@@ -31,7 +31,7 @@ func (header *EthBlockHeader) Encode(params ...any) ([]byte, error) {
 	return encodeEthHeader(header, false)
 }
 
-func (header *EthBlockHeader) Hash(params ...any) ([]byte, error) {
+func (header *NeoxBlockHeader) Hash(params ...any) ([]byte, error) {
 	encode, err := header.Encode(params...)
 	if err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func (header *EthBlockHeader) Hash(params ...any) ([]byte, error) {
 	return common.BytesToHash(crypto.Keccak256(encode)).Bytes(), nil
 }
 
-func (header *EthBlockHeader) ToHeaderParameter() (HeaderParameters, error) {
+func (header *NeoxBlockHeader) ToHeaderParameter() (HeaderParameters, error) {
 	hashableExtraLen := len(header.Extra)
 	switch v := header.Extra[0]; v {
 	case ExtraV0:
@@ -113,7 +113,7 @@ func (header *EthBlockHeader) ToHeaderParameter() (HeaderParameters, error) {
 	}, nil
 }
 
-func (header *EthBlockHeader) ToCompressedHeaderParameters() (CompressHeaderParameters, error) {
+func (header *NeoxBlockHeader) ToCompressedHeaderParameters() (CompressHeaderParameters, error) {
 	hashableExtraLen := len(header.Extra)
 	switch v := header.Extra[0]; v {
 	case ExtraV0:
@@ -179,11 +179,11 @@ func (header *EthBlockHeader) ToCompressedHeaderParameters() (CompressHeaderPara
 
 }
 
-func (header *EthBlockHeader) ExtraVersion() byte {
+func (header *NeoxBlockHeader) ExtraVersion() byte {
 	return header.Extra[0]
 }
 
-func encodeEthHeader(header *EthBlockHeader, noSig bool) ([]byte, error) {
+func encodeEthHeader(header *NeoxBlockHeader, noSig bool) ([]byte, error) {
 	hashableExtraLen := len(header.Extra)
 	if noSig {
 		switch v := header.Extra[0]; v {

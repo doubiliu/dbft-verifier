@@ -14,7 +14,7 @@ import (
 func TestHeaderEncoderV0(t *testing.T) {
 	assert := test.NewAssert(t)
 	_, current := HeaderTestData(ExtraV0)
-	header := NewEthBlockHeader(current)
+	header := NewNeoxBlockHeader(current)
 	pheader, err := header.ToHeaderParameter()
 
 	data, err := header.Encode(false)
@@ -50,7 +50,7 @@ func TestHeaderEncoderV0(t *testing.T) {
 func TestHeaderEncoderV1(t *testing.T) {
 	assert := test.NewAssert(t)
 	_, current := HeaderTestData(ExtraV1)
-	header := NewEthBlockHeader(current)
+	header := NewNeoxBlockHeader(current)
 	pheader, err := header.ToHeaderParameter()
 
 	data, err := header.Encode(false)
@@ -85,7 +85,7 @@ func TestHeaderEncoderV1(t *testing.T) {
 func TestHeaderEncoderV2(t *testing.T) {
 	assert := test.NewAssert(t)
 	_, current := HeaderTestData(ExtraV2)
-	header := NewEthBlockHeader(current)
+	header := NewNeoxBlockHeader(current)
 	pheader, err := header.ToHeaderParameter()
 
 	data, err := header.Encode(false)
@@ -119,22 +119,22 @@ func TestHeaderEncoderV2(t *testing.T) {
 }
 
 func TestRLPEncodeVerifyCircuit(t *testing.T) {
-	extraVersion := ExtraV1
+	extraVersion := ExtraV0
 	var version string
 	switch extraVersion {
 	case ExtraV0:
-		version = "extra_v0"
+		version = "v0"
 	case ExtraV1:
-		version = "extra_v1"
+		version = "v1"
 	case ExtraV2:
-		version = "extra_v2"
+		version = "v2"
 	default:
 		panic("unknown extra version")
 	}
 	instanceConfig := mod.InstanceConfig{
-		CcsPath: fmt.Sprintf("../../cmd/meta/test/v1/rlp_encode_hash_%s_test.ccs", version),
-		PkPath:  fmt.Sprintf("../../cmd/meta/test/v1/rlp_encode_hash_%s_test.pk", version),
-		VkPath:  fmt.Sprintf("../../cmd/meta/test/v1/rlp_encode_hash_%s_test.vk", version),
+		CcsPath: fmt.Sprintf("../../cmd/meta/test/%s/rlp_encode_hash_extra_%s_test.ccs", version, version),
+		PkPath:  fmt.Sprintf("../../cmd/meta/test/%s/rlp_encode_hash_extra_%s_test.pk", version, version),
+		VkPath:  fmt.Sprintf("../../cmd/meta/test/%s/rlp_encode_hash_extra_%s_test.vk", version, version),
 	}
 	err := TestSubCircuitSetup(RlpHash, extraVersion, true, instanceConfig)
 	if err != nil {
@@ -144,9 +144,9 @@ func TestRLPEncodeVerifyCircuit(t *testing.T) {
 
 func TestNoSigHeaderRLPEncodeCircuit(t *testing.T) {
 	instanceConfig := mod.InstanceConfig{
-		CcsPath: "../../cmd/meta/test/v0/rlp_encode_hash_v0_test.ccs",
-		PkPath:  "../../cmd/meta/test/v0/rlp_encode_hash_v0_test.pk",
-		VkPath:  "../../cmd/meta/test/v0/rlp_encode_hash_v0_test.vk",
+		CcsPath: "../../cmd/meta/test/v0/rlp_encode_noSig_hash_extra_v0_test.ccs",
+		PkPath:  "../../cmd/meta/test/v0/rlp_encode_noSig_hash_extra_v0_test.pk",
+		VkPath:  "../../cmd/meta/test/v0/rlp_encode_noSig_hash_extra_v0_test.vk",
 	}
 	err := TestSubCircuitSetup(NoSigRlp, ExtraV0, true, instanceConfig)
 	if err != nil {

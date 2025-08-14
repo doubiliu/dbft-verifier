@@ -18,8 +18,8 @@ func TestVerifyHeaderV0(t *testing.T) {
 	parent, current := HeaderTestData(ExtraV0)
 	rlpHashInstanceConfig := mod.InstanceConfig{
 		CcsPath: "../../cmd/meta/test/v0/rlp_encode_hash_extra_v0_test.ccs",
-		PkPath:  "../../cmd/meta/test/v0/rlp_encode_hash_extra_v0_test.ccs.pk",
-		VkPath:  "../../cmd/meta/test/v0/rlp_encode_hash_extra_v0_test.ccs.vk",
+		PkPath:  "../../cmd/meta/test/v0/rlp_encode_hash_extra_v0_test.pk",
+		VkPath:  "../../cmd/meta/test/v0/rlp_encode_hash_extra_v0_test.vk",
 	}
 	rlpHashInstance, err := mod.LoadFromInstanceConfig(rlpHashInstanceConfig)
 	assert.NoError(t, err)
@@ -59,7 +59,7 @@ func TestVerifyHeaderV0(t *testing.T) {
 	}
 
 	headerGenerator := func() ([]circuit.HashableBlockHeader, error) {
-		return []circuit.HashableBlockHeader{NewEthBlockHeader(parent), NewEthBlockHeader(current)}, nil
+		return []circuit.HashableBlockHeader{NewNeoxBlockHeader(parent), NewNeoxBlockHeader(current)}, nil
 	}
 	ct, err := new(ExtraV0HeaderVerifyWrapper[emulated.Secp256k1Fp, emulated.Secp256k1Fr, sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]).Circuit(
 		headerGenerator,
@@ -130,7 +130,7 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 		return tog2HashVerifyProof, nil
 	}
 	headerGenerator := func() ([]circuit.HashableBlockHeader, error) {
-		return []circuit.HashableBlockHeader{NewEthBlockHeader(parent), NewEthBlockHeader(current)}, nil
+		return []circuit.HashableBlockHeader{NewNeoxBlockHeader(parent), NewNeoxBlockHeader(current)}, nil
 	}
 	//ct, err := new(ExtraV1OrV2HeaderVerifyWrapper[emulated.Secp256k1Fp, emulated.Secp256k1Fr, sw_bn254.ScalarField, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]).Circuit(
 	//	headerGenerator,
@@ -151,7 +151,7 @@ func TestVerifyHeaderV1OrV2(t *testing.T) {
 	assert.NoError(t, err)
 	//ccs, pk, vk, err := helper.TrustedLocalSetup(ct, assignment)
 	//assert.NoError(t, err)
-	//assert.NoError(t, ExportCircuitInstance(mod.PackedCircuitInstance{Ccs: ccs, Pk: pk, Vk: vk}, verifierInstanceConfig))
+	//assert.NoError(t, mod.ExportCircuitInstance(mod.PackedCircuitInstance{Ccs: ccs, Pk: pk, Vk: vk}, verifierInstanceConfig))
 
 	// if has been setup
 	instance, err := mod.LoadFromInstanceConfig(verifierInstanceConfig)

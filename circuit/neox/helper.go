@@ -17,8 +17,6 @@ import (
 	"github.com/consensys/gnark/std/signature/ecdsa"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
-	"github.com/txhsl/neox-dbft-verifier/helper"
-	"github.com/txhsl/neox-dbft-verifier/mod"
 	"math/big"
 )
 
@@ -72,7 +70,7 @@ func publicKeyToVariable(publicKey btcec.PublicKey) ecdsa.PublicKey[emulated.Sec
 func ComputeRLPProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk groth16.ProvingKey, vk groth16.VerifyingKey, header *types.Header, IsNoSig bool) (groth16.Proof, witness.Witness, error) {
 	assignment, err := new(HeaderRLPEncodeVerifyWrapper).Assignment(
 		func() (circuit.HashableBlockHeader, error) {
-			return NewEthBlockHeader(header), nil
+			return NewNeoxBlockHeader(header), nil
 		}, IsNoSig,
 	)
 	if err != nil {
@@ -101,7 +99,7 @@ func ComputeRLPProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk 
 func ComputeToG2HashProof(field, outer *big.Int, ccs constraint.ConstraintSystem, pk groth16.ProvingKey, vk groth16.VerifyingKey, header *types.Header) (groth16.Proof, witness.Witness, error) {
 	assignment, err := new(HeaderHashToG2VerifyWrapper).Assignment(
 		func() (circuit.HashableBlockHeader, error) {
-			return NewEthBlockHeader(header), nil
+			return NewNeoxBlockHeader(header), nil
 		},
 	)
 	w, err := frontend.NewWitness(assignment, field)
@@ -121,17 +119,4 @@ func ComputeToG2HashProof(field, outer *big.Int, ccs constraint.ConstraintSystem
 		return nil, nil, err
 	}
 	return innerProof, innerPubWitness, nil
-}
-
-func ExportCircuitInstance(instance mod.PackedCircuitInstance, instanceConfig mod.InstanceConfig) error {
-	if err := helper.ExportCCS(instance.Ccs, instanceConfig.CcsPath); err != nil {
-		return err
-	}
-	if err := helper.ExportProvingKey(instance.Pk, instanceConfig.PkPath); err != nil {
-		return err
-	}
-	if err := helper.ExportVerifyingKey(instance.Vk, instanceConfig.VkPath); err != nil {
-		return err
-	}
-	return nil
 }

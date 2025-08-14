@@ -40,19 +40,19 @@ func GetSubCircuitWrapper(e CircuitEnum, extraVersion byte) (frontend.Circuit, e
 		return new(HeaderRLPEncodeVerifyWrapper).Circuit(
 			func() (circuit.HashableBlockHeader, error) {
 				header, _ := HeaderTestData(extraVersion)
-				return NewEthBlockHeader(header), nil
+				return NewNeoxBlockHeader(header), nil
 			}, false)
 	case NoSigRlp:
 		return new(HeaderRLPEncodeVerifyWrapper).Circuit(
 			func() (circuit.HashableBlockHeader, error) {
 				header, _ := HeaderTestData(extraVersion)
-				return NewEthBlockHeader(header), nil
+				return NewNeoxBlockHeader(header), nil
 			}, true)
 	case ToG2Hash:
 		return new(HeaderHashToG2VerifyWrapper).Circuit(
 			func() (circuit.HashableBlockHeader, error) {
 				header, _ := HeaderTestData(extraVersion) // v1 and v2 is same
-				return NewEthBlockHeader(header), nil
+				return NewNeoxBlockHeader(header), nil
 			})
 		// todo Verify
 	default:
@@ -64,28 +64,43 @@ func TestSubCircuitSetup(e CircuitEnum, extraVersion byte, export bool, instance
 	var err error
 	switch e {
 	case RlpHash:
-		ct, assignment, err = new(HeaderRLPEncodeVerifyWrapper).instance(
+		ct, err = new(HeaderRLPEncodeVerifyWrapper).Circuit(
 			func() (circuit.HashableBlockHeader, error) {
 				header, _ := HeaderTestData(extraVersion)
-				return NewEthBlockHeader(header), nil
+				return NewNeoxBlockHeader(header), nil
+			}, false)
+		assignment, err = new(HeaderRLPEncodeVerifyWrapper).Assignment(
+			func() (circuit.HashableBlockHeader, error) {
+				header, _ := HeaderTestData(extraVersion)
+				return NewNeoxBlockHeader(header), nil
 			}, false)
 		if err != nil {
 			return err
 		}
 	case NoSigRlp:
-		ct, assignment, err = new(HeaderRLPEncodeVerifyWrapper).instance(
+		ct, err = new(HeaderRLPEncodeVerifyWrapper).Circuit(
 			func() (circuit.HashableBlockHeader, error) {
 				header, _ := HeaderTestData(extraVersion)
-				return NewEthBlockHeader(header), nil
+				return NewNeoxBlockHeader(header), nil
+			}, true)
+		assignment, err = new(HeaderRLPEncodeVerifyWrapper).Assignment(
+			func() (circuit.HashableBlockHeader, error) {
+				header, _ := HeaderTestData(extraVersion)
+				return NewNeoxBlockHeader(header), nil
 			}, true)
 		if err != nil {
 			return err
 		}
 	case ToG2Hash:
-		ct, assignment, err = new(HeaderHashToG2VerifyWrapper).instance(
+		ct, err = new(HeaderHashToG2VerifyWrapper).Circuit(
 			func() (circuit.HashableBlockHeader, error) {
 				header, _ := HeaderTestData(extraVersion)
-				return NewEthBlockHeader(header), nil
+				return NewNeoxBlockHeader(header), nil
+			})
+		assignment, err = new(HeaderHashToG2VerifyWrapper).Assignment(
+			func() (circuit.HashableBlockHeader, error) {
+				header, _ := HeaderTestData(extraVersion)
+				return NewNeoxBlockHeader(header), nil
 			})
 		if err != nil {
 			return err
@@ -159,33 +174,31 @@ func (c *HeaderRLPEncodeVerifyWrapper) Define(api frontend.API) error {
 }
 
 func (c *HeaderRLPEncodeVerifyWrapper) Circuit(headerGenerator func() (circuit.HashableBlockHeader, error), params ...any) (frontend.Circuit, error) {
-	ct, _, err := c.instance(headerGenerator, params...)
-	return ct, err
+	return c.instance(headerGenerator, params...)
 }
 func (c *HeaderRLPEncodeVerifyWrapper) Assignment(headerGenerator func() (circuit.HashableBlockHeader, error), params ...any) (frontend.Circuit, error) {
-	_, assignment, err := c.instance(headerGenerator, params...)
-	return assignment, err
+	return c.instance(headerGenerator, params...)
 }
 
-func (c *HeaderRLPEncodeVerifyWrapper) instance(headerGenerator func() (circuit.HashableBlockHeader, error), params ...any) (frontend.Circuit, frontend.Circuit, error) {
+func (c *HeaderRLPEncodeVerifyWrapper) instance(headerGenerator func() (circuit.HashableBlockHeader, error), params ...any) (frontend.Circuit, error) {
 	if len(params) == 0 {
-		return nil, nil, errors.New("len(params) = 0, need a isNoSig flag(bool)")
+		return nil, errors.New("len(params) = 0, need a isNoSig flag(bool)")
 	}
 	isNoSig, ok := params[0].(bool)
 	if !ok {
-		return nil, nil, errors.New("isNoSig should be bool")
+		return nil, errors.New("isNoSig should be bool")
 	}
 	h, err := headerGenerator()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	header, ok := h.(*EthBlockHeader)
+	header, ok := h.(*NeoxBlockHeader)
 	if !ok {
-		return nil, nil, fmt.Errorf("invalid header")
+		return nil, fmt.Errorf("invalid header")
 	}
 	pheader, err := header.ToCompressedHeaderParameters()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	data, err := header.Encode(isNoSig)
@@ -197,14 +210,11 @@ func (c *HeaderRLPEncodeVerifyWrapper) instance(headerGenerator func() (circuit.
 	r1 := new(big.Int).SetBytes(data[:16])
 	r2 := new(big.Int).SetBytes(data[16:])
 	return &HeaderRLPEncodeVerifyWrapper{
-			Header:       pheader,
-			RlpHash:      [2]frontend.Variable{0, 0},
-			extraVersion: header.ExtraVersion(),
-			isNoSig:      isNoSig,
-		}, &HeaderRLPEncodeVerifyWrapper{
-			Header:  pheader,
-			RlpHash: [2]frontend.Variable{r1, r2},
-		}, nil
+		Header:       pheader,
+		RlpHash:      [2]frontend.Variable{r1, r2},
+		extraVersion: header.ExtraVersion(),
+		isNoSig:      isNoSig,
+	}, nil
 }
 
 // HeaderHashToG2VerifyWrapper is used in V1/V2, generate a proof of HashToG2(NoSigHeader)
@@ -243,26 +253,26 @@ func (c *HeaderHashToG2VerifyWrapper) Define(api frontend.API) error {
 	return nil
 }
 
-func (c *HeaderHashToG2VerifyWrapper) instance(headerGenerator func() (circuit.HashableBlockHeader, error), _ ...any) (frontend.Circuit, frontend.Circuit, error) {
+func (c *HeaderHashToG2VerifyWrapper) instance(headerGenerator func() (circuit.HashableBlockHeader, error), _ ...any) (frontend.Circuit, error) {
 	h, err := headerGenerator()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	header, ok := h.(*EthBlockHeader)
+	header, ok := h.(*NeoxBlockHeader)
 	if !ok {
-		return nil, nil, fmt.Errorf("invalid header")
+		return nil, fmt.Errorf("invalid header")
 	}
 	cheader, err := header.ToCompressedHeaderParameters()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	data, err := header.Encode(true)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	hash, err := bls12381.HashToG2(data, BLSDomain)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	g2HashBytes := hash.Bytes()
 	toG2HashCompressed := [4]frontend.Variable{}
@@ -270,21 +280,16 @@ func (c *HeaderHashToG2VerifyWrapper) instance(headerGenerator func() (circuit.H
 		toG2HashCompressed[i] = new(big.Int).SetBytes(g2HashBytes[i*24 : (i+1)*24])
 	}
 	return &HeaderHashToG2VerifyWrapper{
-			Header:   cheader,
-			ToG2Hash: [4]frontend.Variable{0, 0, 0, 0},
-		}, &HeaderHashToG2VerifyWrapper{
-			Header:   cheader,
-			ToG2Hash: toG2HashCompressed,
-		}, nil
+		Header:   cheader,
+		ToG2Hash: toG2HashCompressed,
+	}, nil
 }
 
 func (c *HeaderHashToG2VerifyWrapper) Circuit(headerGenerator func() (circuit.HashableBlockHeader, error), params ...any) (frontend.Circuit, error) {
-	ct, _, err := c.instance(headerGenerator, params...)
-	return ct, err
+	return c.instance(headerGenerator, params...)
 }
 func (c *HeaderHashToG2VerifyWrapper) Assignment(headerGenerator func() (circuit.HashableBlockHeader, error), params ...any) (frontend.Circuit, error) {
-	_, assignment, err := c.instance(headerGenerator, params...)
-	return assignment, err
+	return c.instance(headerGenerator, params...)
 }
 
 // ExtraV0HeaderVerifyWrapper is used in v0
@@ -319,11 +324,11 @@ func (c *ExtraV0HeaderVerifyWrapper[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl]) Cir
 	if err != nil {
 		return nil, err
 	}
-	parent, ok := headers[0].(*EthBlockHeader)
+	parent, ok := headers[0].(*NeoxBlockHeader)
 	if !ok {
 		return nil, errors.New("invalid blockHeader")
 	}
-	current, ok := headers[1].(*EthBlockHeader)
+	current, ok := headers[1].(*NeoxBlockHeader)
 	if !ok {
 		return nil, errors.New("invalid blockHeader")
 	}
@@ -442,11 +447,11 @@ func (c *ExtraV0HeaderVerifyWrapper[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl]) Ass
 	if err != nil {
 		return nil, err
 	}
-	parent, ok := headers[0].(*EthBlockHeader)
+	parent, ok := headers[0].(*NeoxBlockHeader)
 	if !ok {
 		return nil, errors.New("invalid blockHeader")
 	}
-	current, ok := headers[1].(*EthBlockHeader)
+	current, ok := headers[1].(*NeoxBlockHeader)
 	if !ok {
 		return nil, errors.New("invalid blockHeader")
 	}
@@ -608,11 +613,11 @@ func (c *ExtraV1OrV2HeaderVerifyWrapper[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl])
 	if err != nil {
 		return nil, err
 	}
-	parent, ok := headers[0].(*EthBlockHeader)
+	parent, ok := headers[0].(*NeoxBlockHeader)
 	if !ok {
 		return nil, errors.New("invalid blockHeader")
 	}
-	current, ok := headers[1].(*EthBlockHeader)
+	current, ok := headers[1].(*NeoxBlockHeader)
 	if !ok {
 		return nil, errors.New("invalid blockHeader")
 	}
@@ -698,11 +703,11 @@ func (c *ExtraV1OrV2HeaderVerifyWrapper[ECDSAFp, ECDSAFr, FR, G1El, G2El, GtEl])
 	if err != nil {
 		return nil, err
 	}
-	parent, ok := headers[0].(*EthBlockHeader)
+	parent, ok := headers[0].(*NeoxBlockHeader)
 	if !ok {
 		return nil, errors.New("invalid blockHeader")
 	}
-	current, ok := headers[1].(*EthBlockHeader)
+	current, ok := headers[1].(*NeoxBlockHeader)
 	if !ok {
 		return nil, errors.New("invalid blockHeader")
 	}

@@ -1,4 +1,4 @@
-package circuit
+package n3
 
 import (
 	"github.com/consensys/gnark/frontend"
