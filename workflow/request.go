@@ -1,4 +1,4 @@
-package neox
+package workflow
 
 import (
 	"errors"
@@ -23,23 +23,23 @@ import (
 // todo in this mode, RlpHash and ToG2Hash will have a pipeline
 // In practice, we found that RlpHash's Solve is so fast
 type BlockRequest struct {
-	blockHeader circuit.HashableBlockHeader
-	ce          circuit.CircuitEnum
+	BlockHeader circuit.HashableBlockHeader
+	Ce          circuit.CircuitEnum
 	//blockHeader *types.Header // marshalJson of header, current
 	//isInner   bool      // In this version, we let each node prove either all the innerCircuits or the outerCircuit
-	startTime time.Time // for test
+	StartTime time.Time // for test
 	// todo other element
 }
 
 func (r *BlockRequest) IsInner() bool {
-	return r.ce.IsInner()
+	return r.Ce.IsInner()
 }
 func (r *BlockRequest) Serialize() ([]byte, error) {
-	header, err := r.blockHeader.MarshalJSON()
+	header, err := r.BlockHeader.MarshalJSON()
 	if err != nil {
 		return nil, err
 	}
-	return append([]byte{byte(r.ce)}, header...), nil
+	return append([]byte{byte(r.Ce)}, header...), nil
 }
 
 func (r *BlockRequest) Deserialize(data []byte) error {
@@ -48,10 +48,10 @@ func (r *BlockRequest) Deserialize(data []byte) error {
 	if flag.IsInvalid() {
 		return errors.New("invalid flag")
 	}
-	r.ce = flag
+	r.Ce = flag
 	header := data[1:]
 	//r.blockHeader = new(types.Header)
-	return r.blockHeader.UnmarshalJSON(header)
+	return r.BlockHeader.UnmarshalJSON(header)
 }
 
 func (r *BlockRequest) Option() []backend.ProverOption {
@@ -62,9 +62,9 @@ func (r *BlockRequest) Option() []backend.ProverOption {
 	}
 }
 func (r *BlockRequest) ExtraVersion() (byte, error) {
-	switch r.blockHeader.(type) {
+	switch r.BlockHeader.(type) {
 	case *neox.NeoxBlockHeader:
-		return r.blockHeader.(*neox.NeoxBlockHeader).ExtraVersion(), nil
+		return r.BlockHeader.(*neox.NeoxBlockHeader).ExtraVersion(), nil
 	case *n3.N3BlockHeader:
 		return byte(0), errors.New("n3 block has no extra version")
 	default:
@@ -76,13 +76,13 @@ func (r *BlockRequest) GetWitness(params ...any) (witness.Witness, error) {
 	if len(params) == 0 {
 		return nil, errors.New("invalid number of params provided, expect a circuitEnum at least")
 	}
-	if r.ce.IsNeox() {
-		current, ok := r.blockHeader.(*neox.NeoxBlockHeader)
+	if r.Ce.IsNeox() {
+		current, ok := r.BlockHeader.(*neox.NeoxBlockHeader)
 		if !ok {
 			return nil, errors.New("invalid block header")
 		}
 		extraVersion := current.ExtraVersion()
-		switch r.ce {
+		switch r.Ce {
 		case circuit.RlpHash:
 			assignment, err := new(neox.HeaderRLPEncodeVerifyWrapper).Assignment(
 				func() (circuit.HashableBlockHeader, error) {
@@ -200,7 +200,7 @@ func (r *BlockRequest) GetWitness(params ...any) (witness.Witness, error) {
 			return nil, errors.New("invalid")
 		}
 	} else {
-		current, ok := r.blockHeader.(*n3.N3BlockHeader)
+		current, ok := r.BlockHeader.(*n3.N3BlockHeader)
 		if !ok {
 			return nil, errors.New("invalid block header")
 		}

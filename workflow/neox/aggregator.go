@@ -18,6 +18,7 @@ import (
 	"github.com/txhsl/neox-dbft-verifier/mod"
 	"github.com/txhsl/neox-dbft-verifier/plugin/pipeline"
 	"github.com/txhsl/neox-dbft-verifier/service"
+	"github.com/txhsl/neox-dbft-verifier/workflow"
 	"golang.org/x/sync/errgroup"
 	"time"
 )
@@ -81,7 +82,7 @@ func NewPackedBlockHeader(header circuit.HashableBlockHeader) *PackedBlockHeader
 
 type Aggregator struct {
 	config.CommonConfig
-	tasks chan Task
+	tasks chan workflow.Task
 	service.AggregateServer
 	service.DistributeServer
 	feedback               chan error
@@ -191,13 +192,13 @@ func (agg *Aggregator) processDistributeRequest() {
 }
 func (agg *Aggregator) computeFirstBlockRlpHash(header *neox.NeoxBlockHeader, blockHash string) error {
 	fmt.Println("Start computing the first block rlpHash proof")
-	blockRequest := BlockRequest{
-		blockHeader: header,
-		ce:          circuit.RlpHash,
-		startTime:   time.Now(),
+	blockRequest := workflow.BlockRequest{
+		BlockHeader: header,
+		Ce:          circuit.RlpHash,
+		StartTime:   time.Now(),
 	}
 
-	rlpHashTask := Task{&blockRequest, make([]any, 0)}
+	rlpHashTask := workflow.NewTask(&blockRequest)
 	rlpWitness, err := rlpHashTask.Witness()
 	proof, err := groth16.Prove(agg.rlpHashOneTimeInstance.Ccs, agg.rlpHashOneTimeInstance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
 	if err != nil {
@@ -210,7 +211,7 @@ func (agg *Aggregator) computeFirstBlockRlpHash(header *neox.NeoxBlockHeader, bl
 	pb := agg.headers[blockHash]
 	pb.currentRlpHashProof = proof
 	pb.isVerified = true
-	fmt.Printf("first block's rlpHash Proof has computed, block height: %d\n", header.Number)
+	fmt.Printf("first block's rlpHash Proof has computed, block height: %d\n", header.Number())
 	// delete
 	agg.rlpHashOneTimeInstance = nil
 	return nil
@@ -274,11 +275,11 @@ func (agg *Aggregator) processAggregateRequest() {
 			continue
 		}
 		// new task
-		task := Task{
-			BlockRequest: &BlockRequest{
-				blockHeader: current,
-				ce:          circuit.NeoxOuter,
-				startTime:   time.Now(),
+		task := workflow.Task{
+			BlockRequest: &workflow.BlockRequest{
+				BlockHeader: current,
+				Ce:          circuit.NeoxOuter,
+				StartTime:   time.Now(),
 			},
 		}
 		go func() { agg.tasks <- task }()
@@ -299,7 +300,7 @@ func (agg *Aggregator) runInPipeline() error {
 
 	go func() {
 		for task := range agg.tasks {
-			header, ok := task.blockHeader.(*neox.NeoxBlockHeader)
+			header, ok := task.BlockHeader.(*neox.NeoxBlockHeader)
 			if !ok {
 				agg.feedback <- errors.New("invalid header type")
 				continue
@@ -327,7 +328,7 @@ func (agg *Aggregator) runInPipeline() error {
 	}()
 	go func() {
 		for response := range scheduler.Response {
-			header, ok := response.Request.(*Task).blockHeader.(*neox.NeoxBlockHeader)
+			header, ok := response.Request.(*workflow.Task).BlockHeader.(*neox.NeoxBlockHeader)
 			if !ok {
 				agg.feedback <- errors.New("invalid header type")
 				continue
@@ -360,7 +361,7 @@ func (agg *Aggregator) runInSerial() error {
 	go func() {
 		for task := range agg.tasks {
 
-			header, ok := task.blockHeader.(*neox.NeoxBlockHeader)
+			header, ok := task.BlockHeader.(*neox.NeoxBlockHeader)
 			if !ok {
 				agg.feedback <- errors.New("invalid header type")
 				continue
@@ -415,7 +416,7 @@ func (agg *Aggregator) FromCommonConfig(cc config.CommonConfig, params ...any) e
 	agg.feedback = make(chan error, 100) // todo
 	agg.DistributeServer = *service.NewDistributeServer(agg.ServiceConfig, agg.feedback)
 	agg.AggregateServer = *service.NewAggregateServer(agg.ServiceConfig, agg.feedback)
-	agg.tasks = make(chan Task, 100) // todo
+	agg.tasks = make(chan workflow.Task, 100) // todo
 	agg.headers = make(map[string]*PackedBlockHeader)
 	agg.isNoFork = isNoFork
 	return nil
@@ -429,7 +430,7 @@ func NewAggregator(nodeConfig config.NodeConfig, serviceConfig config.ServiceCon
 	node.feedback = make(chan error, 100) // todo
 	node.DistributeServer = *service.NewDistributeServer(serviceConfig, node.feedback)
 	node.AggregateServer = *service.NewAggregateServer(serviceConfig, node.feedback)
-	node.tasks = make(chan Task, 100) // todo
+	node.tasks = make(chan workflow.Task, 100) // todo
 	node.headers = make(map[string]*PackedBlockHeader)
 	node.isNoFork = isNoFork
 	return node

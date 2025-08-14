@@ -6,7 +6,7 @@ import (
 
 func TestAggregatorWorkflow(t *testing.T) {
 	aggregator := new(Aggregator)
-	err := aggregator.FromJson("../cmd/workflow/configs/172.23.166.111/config_node_0.json")
+	err := aggregator.FromJson("../../cmd/workflow/configs/172.23.166.111/node_0/common_config.json")
 	if err != nil {
 		panic(err)
 	}

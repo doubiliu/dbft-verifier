@@ -13,6 +13,7 @@ import (
 	"github.com/txhsl/neox-dbft-verifier/mod"
 	"github.com/txhsl/neox-dbft-verifier/plugin/pipeline"
 	"github.com/txhsl/neox-dbft-verifier/service"
+	"github.com/txhsl/neox-dbft-verifier/workflow"
 	"golang.org/x/sync/errgroup"
 	"time"
 )
@@ -21,7 +22,7 @@ import (
 // each node only proves one certain circuit
 type Worker struct {
 	config.CommonConfig
-	tasks chan Task
+	tasks chan workflow.Task
 	service.DistributeServer
 	service.AggregateClient
 	feedback chan error
@@ -141,12 +142,12 @@ func (n *Worker) runInSerial() error {
 				n.feedback <- err
 			}
 			fmt.Printf("receive block distribute request, block height: %d\n", header.Number())
-			blockRequest := BlockRequest{
-				blockHeader: header,
-				ce:          circuit.RlpHash,
-				startTime:   time.Now(),
+			blockRequest := workflow.BlockRequest{
+				BlockHeader: header,
+				Ce:          circuit.RlpHash,
+				StartTime:   time.Now(),
 			}
-			rlpHashTask := Task{&blockRequest, make([]any, 0)}
+			rlpHashTask := workflow.NewTask(&blockRequest)
 			rlpWitness, err := rlpHashTask.Witness()
 			if err != nil {
 				n.feedback <- err
@@ -188,7 +189,7 @@ func (n *Worker) runInSerial() error {
 				continue
 			}
 			//nextResponse := pipeline.NewProveResponse(&next, nextProof, next.ce)
-			err = n.CommitProof(header, nextProof, next.ce)
+			err = n.CommitProof(header, nextProof, next.CircuitEnum())
 			fmt.Printf("finish next proof, block height: %d\n", header.Number())
 
 		}
@@ -228,12 +229,12 @@ func (n *Worker) runInPipeline() error {
 				n.feedback <- err
 			}
 			fmt.Printf("receive block distribute request, block height: %d\n", header.Number())
-			blockRequest := BlockRequest{
-				blockHeader: header,
-				ce:          circuit.RlpHash,
-				startTime:   time.Now(),
+			blockRequest := workflow.BlockRequest{
+				BlockHeader: header,
+				Ce:          circuit.RlpHash,
+				StartTime:   time.Now(),
 			}
-			task := Task{&blockRequest, make([]any, 0)}
+			task := workflow.NewTask(&blockRequest)
 			n.tasks <- task                    // tasks is used for serial running
 			next, isFinish, err := task.Next() // can pipeline
 			if err != nil {
@@ -259,8 +260,8 @@ func (n *Worker) runInPipeline() error {
 	//}()
 	go func() {
 		for response := range nextScheduler.Response {
-			fmt.Printf("finish next proof, circuit: %d, block height: %d\n", response.CircuitType, response.Request.(*Task).blockHeader.Number())
-			err = n.CommitProof(response.Request.(*Task).blockHeader.(*neox.NeoxBlockHeader), response.Proof, response.CircuitEnum())
+			fmt.Printf("finish next proof, circuit: %d, block height: %d\n", response.CircuitType, response.Request.(*workflow.Task).BlockHeader.Number())
+			err = n.CommitProof(response.Request.(*workflow.Task).BlockHeader.(*neox.NeoxBlockHeader), response.Proof, response.CircuitEnum())
 			if err != nil {
 				n.feedback <- err
 			}
@@ -296,14 +297,14 @@ func (n *Worker) runInPipeline() error {
 
 			proof, err := groth16.Prove(rlpInstance.Ccs, rlpInstance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
 			if err != nil {
-				fmt.Println("rlpHash prove error in block", task.blockHeader.Number())
+				fmt.Println("rlpHash prove error in block", task.BlockHeader.Number())
 				n.feedback <- err
 				continue
 			}
-			fmt.Printf("finish rlpHash proof, block height: %d\n", task.blockHeader.Number())
+			fmt.Printf("finish rlpHash proof, block height: %d\n", task.BlockHeader.Number())
 			//proveResponse := pipeline.NewProveResponse(&rlpHashTask, proof, circuit.RlpHash)
 			//n.tmp <- proveResponse
-			err = n.CommitProof(task.blockHeader.(*neox.NeoxBlockHeader), proof, circuit.RlpHash)
+			err = n.CommitProof(task.BlockHeader.(*neox.NeoxBlockHeader), proof, circuit.RlpHash)
 			if err != nil {
 				n.feedback <- err
 				continue
@@ -318,7 +319,7 @@ func (n *Worker) FromCommonConfig(cc config.CommonConfig, params ...any) error {
 	n.feedback = make(chan error, 100) // todo
 	n.AggregateClient = *service.NewAggregateClient(n.ServiceConfig)
 	n.DistributeServer = *service.NewDistributeServer(n.ServiceConfig, n.feedback)
-	n.tasks = make(chan Task, 100) // todo
+	n.tasks = make(chan workflow.Task, 100) // todo
 	return nil
 }
 func NewWorker(nodeConfig config.NodeConfig, serviceConfig config.ServiceConfig) Worker {
@@ -328,6 +329,6 @@ func NewWorker(nodeConfig config.NodeConfig, serviceConfig config.ServiceConfig)
 	node.feedback = make(chan error, 100) // todo
 	node.AggregateClient = *service.NewAggregateClient(serviceConfig)
 	node.DistributeServer = *service.NewDistributeServer(serviceConfig, node.feedback)
-	node.tasks = make(chan Task, 100) // todo
+	node.tasks = make(chan workflow.Task, 100) // todo
 	return node
 }
