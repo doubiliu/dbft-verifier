@@ -85,12 +85,13 @@ func (c *HeaderRLPEncodeVerifyWrapper) Assignment(headerGenerator func() (circui
 }
 
 func (c *HeaderRLPEncodeVerifyWrapper) instance(headerGenerator func() (circuit.HashableBlockHeader, error), params ...any) (frontend.Circuit, error) {
-	if len(params) == 0 {
-		return nil, errors.New("len(params) = 0, need a isNoSig flag(bool)")
-	}
-	isNoSig, ok := params[0].(bool)
-	if !ok {
-		return nil, errors.New("isNoSig should be bool")
+	isNoSig := false
+	var ok bool
+	if len(params) != 0 {
+		isNoSig, ok = params[0].(bool)
+		if !ok {
+			return nil, errors.New("isNoSig should be bool")
+		}
 	}
 	h, err := headerGenerator()
 	if err != nil {

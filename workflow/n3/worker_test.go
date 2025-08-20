@@ -1,4 +1,4 @@
-package neox
+package n3
 
 import (
 	"github.com/txhsl/neox-dbft-verifier/config"
@@ -6,7 +6,10 @@ import (
 )
 
 func TestWorkerWorkflow(t *testing.T) {
-	commonConfig, err := config.LoadConfigFromJson("../../cmd/workflow/configs/172.23.166.111/node_2/common_config.json")
+	commonConfig, err := config.LoadConfigFromJson("../../cmd/workflow/configs/localhost/node_1/common_config.json")
+	if err != nil {
+		panic(err)
+	}
 	worker := new(Worker)
 	err = worker.FromCommonConfig(commonConfig)
 	if err != nil {

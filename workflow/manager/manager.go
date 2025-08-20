@@ -1,14 +1,11 @@
-package workflow
+package manager
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/ethclient"
-	neox "github.com/txhsl/neox-dbft-verifier/circuit/neox"
 	"github.com/txhsl/neox-dbft-verifier/config"
 	"github.com/txhsl/neox-dbft-verifier/service"
-	"math/big"
 	"os"
 	"time"
 )
@@ -16,55 +13,49 @@ import (
 // BlockManager gets the blocks and send block to inner Worker Node
 // BlockManager can be run in both n3/neox
 type BlockManager struct {
-	config   *config.ServiceConfig
-	client   *ethclient.Client
-	stopCh   chan struct{}
-	feedback chan error
+	blockFetcher BlockFetcher
+	config       *config.ServiceConfig
+	stopCh       chan struct{}
+	feedback     chan error
 	service.DistributeClient
 	isNeox bool // if is neox, block is NeoxBlockHeader, else is N3BlockHeader
 }
 
-func NewBlockManager(cfg config.ServiceConfig) *BlockManager {
-	return &BlockManager{
-		config:           &cfg,
-		stopCh:           make(chan struct{}, 1),
-		feedback:         make(chan error, 1),
-		client:           nil,
-		DistributeClient: *service.NewDistributeClient(cfg),
-	}
-}
 func (manager *BlockManager) Start() error {
 	fmt.Println(manager.config)
-	client, err := ethclient.Dial(manager.config.Network.BlockSource)
-	if err != nil {
-		return fmt.Errorf("failed to dial block source: %w", err)
+	if manager.isNeox {
+		manager.blockFetcher = new(NeoxBlockFetcher)
+	} else {
+		manager.blockFetcher = new(N3BlockFetcher)
 	}
-	manager.client = client
+	err := manager.blockFetcher.Connect(manager.config.Network.BlockSource)
+	if err != nil {
+		return err
+	}
 	// first, we should select a block as the start, and then send to aggregator to compute rlpHash proof
 	ctx, cancel := context.WithTimeout(context.Background(), config.CONNECT_TIMEOUT)
 	defer cancel()
-	firstBlockNumber, err := manager.client.BlockNumber(ctx)
+	firstBlockNumber, err := manager.blockFetcher.LatestBlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get block number: %w", err)
 	}
-	firstBlockHeader, err := manager.client.HeaderByNumber(ctx, big.NewInt(int64(firstBlockNumber)))
+	firstBlockHeader, err := manager.blockFetcher.FetchBlockByBlockNumber(ctx, firstBlockNumber)
 	if err != nil {
 		return fmt.Errorf("failed to get first block header: %w", err)
 	}
 	time.Sleep(5 * time.Second) // todo
-	go func() {
-		for {
-			err = manager.DistributeBlock(neox.NewNeoxBlockHeader(firstBlockHeader), true) // we simply send it to all nodes(workers and aggregator, workers will ignore it)
-			if err != nil {
-				manager.feedback <- err
-			} else {
-				break
-			}
+	current := firstBlockNumber
+	if manager.isNeox {
+		err = manager.DistributeBlock(firstBlockHeader, true, true) // we simply send it to all nodes(workers and aggregator, workers will ignore it in neox)
+		if err != nil {
+			manager.feedback <- err
 		}
-	}()
+		current++
+		time.Sleep(5 * time.Second)
+	}
+
 	go func() {
-		defer manager.client.Close()
-		current := firstBlockNumber + 1
+		defer manager.Stop()
 		for {
 			select {
 			case <-manager.stopCh:
@@ -92,15 +83,15 @@ func (manager *BlockManager) fetchBlock(blockNumber uint64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.CONNECT_TIMEOUT)
 	defer cancel()
 
-	header, err := manager.client.HeaderByNumber(ctx, big.NewInt(int64(blockNumber)))
+	header, err := manager.blockFetcher.FetchBlockByBlockNumber(ctx, blockNumber)
 	if err != nil {
 		return err
 	}
-	return manager.DistributeBlock(neox.NewNeoxBlockHeader(header), false)
-
+	return manager.DistributeBlock(header, manager.isNeox, false)
 }
 func (manager *BlockManager) Stop() {
 	close(manager.stopCh)
+	manager.blockFetcher.Close()
 }
 
 func (manager *BlockManager) Feedback() chan error {
@@ -121,4 +112,8 @@ func (manager *BlockManager) FromJson(jsonPath string) error {
 	manager.feedback = make(chan error, 1)
 	manager.DistributeClient = *service.NewDistributeClient(*manager.config)
 	return nil
+}
+
+func NewBlockManager(isNeox bool) *BlockManager {
+	return &BlockManager{isNeox: isNeox}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/consensys/gnark/backend/groth16"
 	groth16_bn254 "github.com/consensys/gnark/backend/groth16/bn254"
 	stdgroth16 "github.com/consensys/gnark/std/recursion/groth16"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
 	neox "github.com/txhsl/neox-dbft-verifier/circuit/neox"
@@ -111,7 +112,6 @@ func (agg *Aggregator) loadOneTimeRlpInstance() error {
 func (agg *Aggregator) Start() error {
 	//runtime.GOMAXPROCS(agg.NbMaxCPU)
 	if agg.Job != config.Aggregator {
-		fmt.Println(agg.Job)
 		return errors.New("not a aggregator")
 	}
 	go func() {
@@ -160,7 +160,7 @@ func (agg *Aggregator) Start() error {
 // we append the block into headers map, each block waits for sub-circuit proofs
 func (agg *Aggregator) processDistributeRequest() {
 	for request := range agg.DistributeChannel() {
-		header := new(neox.NeoxBlockHeader)
+		header := neox.NewNeoxBlockHeader(new(types.Header))
 		err := header.UnmarshalJSON(request.Header)
 		if err != nil {
 			agg.feedback <- err
@@ -179,7 +179,7 @@ func (agg *Aggregator) processDistributeRequest() {
 			continue
 		}
 		agg.headers[hex.EncodeToString(blockHash)] = NewPackedBlockHeader(header)
-		fmt.Printf("Receive a new block, block height: %d, block hash: %v\n", header.Number(), blockHash)
+		fmt.Printf("Receive a new block, block height: %d, block hash: %v\n", header.Height(), blockHash)
 		if request.IsReliable {
 			go func() {
 				if err = agg.computeFirstBlockRlpHash(header, hex.EncodeToString(blockHash)); err != nil {
@@ -211,7 +211,7 @@ func (agg *Aggregator) computeFirstBlockRlpHash(header *neox.NeoxBlockHeader, bl
 	pb := agg.headers[blockHash]
 	pb.currentRlpHashProof = proof
 	pb.isVerified = true
-	fmt.Printf("first block's rlpHash Proof has computed, block height: %d\n", header.Number())
+	fmt.Printf("first block's rlpHash Proof has computed, block height: %d\n", header.Height())
 	// delete
 	agg.rlpHashOneTimeInstance = nil
 	return nil
@@ -241,7 +241,7 @@ func (agg *Aggregator) processAggregateRequest() {
 			agg.feedback <- errors.New("invalid block type")
 			continue
 		}
-		fmt.Printf("Receive a Aggregate request, block hash: %v, block height: %d, circuit: %d\n", blockHash, current.Number(), request.Circuit)
+		fmt.Printf("Receive a Aggregate request, block hash: %v, block height: %d, circuit: %d\n", blockHash, current.Height(), request.Circuit)
 		switch circuit.CircuitEnum(request.Circuit) {
 		case circuit.RlpHash:
 			if pb.currentRlpHashProof == nil {
@@ -312,7 +312,7 @@ func (agg *Aggregator) runInPipeline() error {
 				agg.feedback <- err
 				continue
 			}
-			fmt.Printf("Start prove a aggregate circuit, block hash: %v, block height: %d\n", blockHash, header.Number())
+			fmt.Printf("Start prove a aggregate circuit, block hash: %v, block height: %d\n", blockHash, header.Height())
 
 			currentPb, _ := agg.headers[hex.EncodeToString(blockHash)] // no need to check, since before the task is created, headers[hashString] has been checked
 			rlpHashProof, nextProof, err := currentPb.Proofs()
@@ -339,7 +339,7 @@ func (agg *Aggregator) runInPipeline() error {
 				continue
 			}
 
-			fmt.Printf("finish outer aggregate proof, block height: %d, block hash: %v, proof: %v\n", header.Number(), blockHash, response.Proof)
+			fmt.Printf("finish outer aggregate proof, block height: %d, block hash: %v, proof: %v\n", header.Height(), blockHash, response.Proof)
 		}
 	}()
 	go func() {
@@ -373,7 +373,7 @@ func (agg *Aggregator) runInSerial() error {
 				agg.feedback <- err
 				continue
 			}
-			fmt.Printf("Start prove a aggregate circuit, block hash: %v, block height: %d\n", blockHash, header.Number())
+			fmt.Printf("Start prove a aggregate circuit, block hash: %v, block height: %d\n", blockHash, header.Height())
 
 			currentPb, _ := agg.headers[hex.EncodeToString(blockHash)] // no need to check, since before the task is created, headers[hashString] has been checked
 			rlpHashProof, nextProof, err := currentPb.Proofs()
@@ -394,7 +394,7 @@ func (agg *Aggregator) runInSerial() error {
 			if err != nil {
 				agg.feedback <- err
 			}
-			fmt.Printf("finish outer aggregate proof, block height: %d, block hash: %v, proof: %v\n", header.Number(), blockHash, proof)
+			fmt.Printf("finish outer aggregate proof, block height: %d, block hash: %v, proof: %v\n", header.Height(), blockHash, proof)
 
 		}
 	}()
@@ -412,7 +412,6 @@ func (agg *Aggregator) FromCommonConfig(cc config.CommonConfig, params ...any) e
 		isNoFork = params[0].(bool)
 	}
 	//agg.CommonConfig, err = config.LoadConfigFromJson(jsonPath)
-	fmt.Println(agg.CommonConfig.Network)
 	agg.feedback = make(chan error, 100) // todo
 	agg.DistributeServer = *service.NewDistributeServer(agg.ServiceConfig, agg.feedback)
 	agg.AggregateServer = *service.NewAggregateServer(agg.ServiceConfig, agg.feedback)

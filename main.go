@@ -3,7 +3,8 @@ package main
 import (
 	"flag"
 	"github.com/txhsl/neox-dbft-verifier/config"
-	"github.com/txhsl/neox-dbft-verifier/workflow"
+	"github.com/txhsl/neox-dbft-verifier/workflow/manager"
+	"github.com/txhsl/neox-dbft-verifier/workflow/n3"
 	"github.com/txhsl/neox-dbft-verifier/workflow/neox"
 )
 
@@ -14,10 +15,18 @@ func main() {
 	var (
 		job        string
 		configPath string
+		chain      string
 	)
+	flag.StringVar(&chain, "chain", "neox", "chain type, n3 or neox")
 	flag.StringVar(&job, "job", "node", "node job, manager or node")
 	flag.StringVar(&configPath, "config", "common_config.json", "config json file for loading config into node or manager")
 	flag.Parse()
+	if chain != "neox" && chain != "n3" {
+		panic("invalid chain")
+	}
+	if job != "node" && job != "manager" {
+		panic("invalid job")
+	}
 	switch job {
 	case "node":
 		commonConfig, err := config.LoadConfigFromJson(configPath)
@@ -26,14 +35,26 @@ func main() {
 		}
 		switch commonConfig.Job {
 		case config.Worker:
-			var worker neox.Worker
-			err = worker.FromCommonConfig(commonConfig)
-			if err != nil {
-				panic(err)
-			}
-			err = worker.Start() // blocked
-			if err != nil {
-				panic(err)
+			if chain == "neox" {
+				var worker neox.Worker
+				err = worker.FromCommonConfig(commonConfig)
+				if err != nil {
+					panic(err)
+				}
+				err = worker.Start() // blocked
+				if err != nil {
+					panic(err)
+				}
+			} else {
+				var worker n3.Worker
+				err = worker.FromCommonConfig(commonConfig)
+				if err != nil {
+					panic(err)
+				}
+				err = worker.Start()
+				if err != nil {
+					panic(err)
+				}
 			}
 		case config.Aggregator:
 			var aggregator neox.Aggregator
@@ -51,16 +72,17 @@ func main() {
 
 		}
 	case "manager":
-		manager := new(workflow.BlockManager)
-		err := manager.FromJson("../cmd/workflow/configs/manager.json")
+		m := new(manager.BlockManager)
+
+		err := m.FromJson("../cmd/workflow/configs/manager.json")
 		if err != nil {
 			panic(err)
 		}
-		err = manager.Start()
+		err = m.Start()
 		if err != nil {
 			panic(err)
 		}
-		for err := range manager.Feedback() {
+		for err := range m.Feedback() {
 			panic(err)
 		}
 	default:

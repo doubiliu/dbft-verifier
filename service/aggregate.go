@@ -70,37 +70,56 @@ func NewAggregateClient(config config.ServiceConfig) *AggregateClient {
 }
 
 func (ac *AggregateClient) CommitProof(block *neox.NeoxBlockHeader, proof groth16.Proof, ce circuit.CircuitEnum) error {
-	conn, err := grpc.NewClient(ac.ServerURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return err
+	// we should choose an aggregator to commit our proof, notice that the first rlp proof is done by alloc()
+
+	// Note: Important!!!
+	// the rlpHash proof should be committed to 2 aggregators, as parent or current
+	aggIDs := []config.NodeID{ac.config.AllocBlock(block.Height(), false)} // current
+	if ce == circuit.RlpHash {
+		// as parent!!!
+		aggIDs = append(aggIDs, ac.config.AllocBlock(block.Height()+1, false))
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), config.CONNECT_TIMEOUT)
 	defer cancel()
-	client := aggregate.NewAggregateServiceClient(conn)
-	// we compute rlpHash here in avoid to modify the params
-	blockHash, err := block.Hash()
-	if err != nil {
-		return err
-	}
+	for _, aggregateID := range aggIDs {
+		agg, ok := ac.config.Network.Aggregators[aggregateID]
+		if !ok {
+			return fmt.Errorf("unknown aggregator %s", aggregateID)
+		}
 
-	buf := bytes.NewBuffer([]byte{})
-	_, err = proof.(*groth16_bn254.Proof).WriteTo(buf)
-	if err != nil {
-		return err
-	}
+		conn, err := grpc.NewClient(agg.AggregateString(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			return err
+		}
+		client := aggregate.NewAggregateServiceClient(conn)
+		// we compute rlpHash here in avoid to modify the params
+		blockHash, err := block.Hash()
+		if err != nil {
+			return err
+		}
 
-	request := &aggregate.AggregateRequest{
-		BlockHash: blockHash,
-		Proof:     buf.Bytes(), // todo read
-		Circuit:   int32(ce),
+		buf := bytes.NewBuffer([]byte{})
+		_, err = proof.(*groth16_bn254.Proof).WriteTo(buf)
+		if err != nil {
+			return err
+		}
+
+		request := &aggregate.AggregateRequest{
+			BlockHash: blockHash,
+			Proof:     buf.Bytes(), // todo read
+			Circuit:   int32(ce),
+		}
+		response, err := client.Commit(ctx, request)
+		if err != nil {
+			return err
+		}
+		if !response.Success {
+			return errors.New("commit proof failed, verify not success")
+		}
+		if err = conn.Close(); err != nil {
+			return nil
+		}
 	}
-	response, err := client.Commit(ctx, request)
-	if err != nil {
-		return err
-	}
-	if !response.Success {
-		return errors.New("commit proof failed, verify not success")
-	}
-	return conn.Close()
+	return nil
 
 }

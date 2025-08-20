@@ -155,8 +155,13 @@ if __name__ == "__main__":
                         help="Enable Pipeline mode for all nodes. If not present, Serial mode is used.")
     parser.add_argument("--version", default="v1", choices=["v0", "v1", "v2"],
                         help="The 'extra_version' for all nodes.\nDefault: v1")
-
+    parser.add_argument('--chain', type=str, required=True, choices=['neox', 'n3'],
+                      help='Chain of operation: neox (with aggregators and workers) or n3 (only workers)')
     args = parser.parse_args()
+    if args.chain == "neox":
+        SHARED_BLOCK_SOURCE = "https://neoxt4seed1.ngd.network/"
+    else:
+        SHARED_BLOCK_SOURCE = "http://seed5t5.neo.org:20332"
 
     try:
         address_data = load_yaml_file(args.addresses, "address")

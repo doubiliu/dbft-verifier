@@ -120,27 +120,42 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = argparse.ArgumentParser(description='Generates YAML file with aggregator and worker addresses')
     
+    # Add mode selection (neox or n3)
+    parser.add_argument('--chain', type=str, required=True, choices=['neox', 'n3'],
+                      help='Chain of operation: neox (with aggregators and workers) or n3 (only workers)')
+
     # Add command line arguments
-    parser.add_argument('--aggregators', type=int, required=True,
-                      help='Total number of aggregators to create')
+    parser.add_argument('--aggregators', type=int,
+                      help='Total number of aggregators to create (required for neox mode)')
     parser.add_argument('--workers', type=int, required=True,
                       help='Total number of workers to create')
-    parser.add_argument('--max-agg-per-ip', type=int, required=True, 
-                      help='Maximum number of aggregators allowed per IP address')
-    parser.add_argument('--max-workers-per-ip', type=int, required=True, 
+    parser.add_argument('--max-agg-per-ip', type=int,
+                      help='Maximum number of aggregators allowed per IP address (required for neox mode)')
+    parser.add_argument('--max-workers-per-ip', type=int, required=True,
                       help='Maximum number of workers allowed per IP address')
-    parser.add_argument('--distribute-base-port', type=int, required=True, 
+    parser.add_argument('--distribute-base-port', type=int, required=True,
                       help='Base port number for distribute ports')
-    parser.add_argument('--aggregate-base-port', type=int, required=True, 
-                      help='Base port number for aggregate ports')
-    parser.add_argument('--input', type=str, default=IP_CONFIG_FILE, 
+    parser.add_argument('--aggregate-base-port', type=int,
+                      help='Base port number for aggregate ports (required for neox mode)')
+    parser.add_argument('--input', type=str, default=IP_CONFIG_FILE,
                       help=f'Path to input IP config file (default: {IP_CONFIG_FILE})')
-    parser.add_argument('--output', type=str, default=OUTPUT_YAML_FILE, 
+    parser.add_argument('--output', type=str, default=OUTPUT_YAML_FILE,
                       help=f'Path to output network config file (default: {OUTPUT_YAML_FILE})')
-    
+
     # Parse command line arguments
     args = parser.parse_args()
 
+    # Validate arguments based on mode
+    if args.chain == 'neox':
+        # For neox mode, check that required aggregator arguments are provided
+        if args.aggregators is None or args.max_agg_per_ip is None or args.aggregate_base_port is None:
+            print("Error: For neox mode, --aggregators, --max-agg-per-ip and --aggregate-base-port are required")
+            sys.exit(1)
+    elif args.chain == 'n3':
+        # For n3 mode, ensure aggregator-related arguments are not provided
+        if args.aggregators is not None or args.max_agg_per_ip is not None or args.aggregate_base_port is not None:
+            print("Error: For n3 mode, --aggregators, --max-agg-per-ip and --aggregate-base-port should not be provided")
+#             sys.exit(1)
     # 1. Get the list of IPs from the config file
     all_ips = get_ips_from_config(args.input)
 
@@ -152,32 +167,45 @@ if __name__ == "__main__":
         # Create a single ID counter for all processes
         id_counter = itertools.count()
 
-        # 3. Generate addresses using the specific functions
-        agg_configs = distribute_aggregators(
-            args.aggregators, aggregator_ips, args.max_agg_per_ip,
-            args.distribute_base_port, args.aggregate_base_port, id_counter
-        )
-        worker_configs = distribute_workers(
-            args.workers, worker_ips, args.max_workers_per_ip, 
-            args.distribute_base_port + args.aggregators, id_counter
-        )
+        # Initialize configurations
+        agg_configs = []
+        worker_configs = []
 
-        # 4. Print results to the console
-        print(f"\n--- Aggregator Configurations ({len(agg_configs)}) ---")
-        for agg in agg_configs:
-            print(f"  ID: {agg['id']:<3} Address: {agg['address']:<15} Distribute Port: {agg['distribute_port']:<5} Aggregate Port: {agg['aggregate_port']}")
+        # 3. Generate addresses based on mode
+        if args.chain == 'neox':
+            # Generate both aggregators and workers for neox mode
+            agg_configs = distribute_aggregators(
+                args.aggregators, aggregator_ips, args.max_agg_per_ip,
+                args.distribute_base_port, args.aggregate_base_port, id_counter
+            )
+            # For workers, start ports after aggregators' distribute ports
+            worker_configs = distribute_workers(
+                args.workers, worker_ips, args.max_workers_per_ip,
+                args.distribute_base_port + args.aggregators, id_counter
+            )
 
+            # Print aggregator results
+            print(f"\n--- Aggregator Configurations ({len(agg_configs)}) ---")
+            for agg in agg_configs:
+                print(f"  ID: {agg['id']:<3} Address: {agg['address']:<15} Distribute Port: {agg['distribute_port']:<5} Aggregate Port: {agg['aggregate_port']}")
+        else:  # n3 mode
+            # Generate only workers for n3 mode
+            worker_configs = distribute_workers(
+                args.workers, worker_ips, args.max_workers_per_ip,
+                args.distribute_base_port, id_counter
+            )
+
+        # Print worker results
         print(f"\n--- Worker Configurations ({len(worker_configs)}) ---")
         for worker in worker_configs:
             print(f"  ID: {worker['id']:<3} Address: {worker['address']:<15} Port: {worker['distribute_port']}")
 
-        # 5. Structure the data for YAML output
-        output_data = {
-            'aggregators': agg_configs,
-            'workers': worker_configs
-        }
+        # 4. Structure the data for YAML output
+        output_data = {'workers': worker_configs}
+        if args.chain == 'neox':
+            output_data['aggregators'] = agg_configs
 
-        # 6. Write the structured data to the output YAML file
+        # 5. Write the structured data to the output YAML file
         with open(args.output, 'w') as f:
             yaml.dump(output_data, f, default_flow_style=False, sort_keys=False)
 

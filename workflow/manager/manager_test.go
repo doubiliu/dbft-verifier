@@ -1,12 +1,12 @@
-package workflow
+package manager
 
 import (
 	"testing"
 )
 
 func TestManagerWorkflow(t *testing.T) {
-	manager := new(BlockManager)
-	err := manager.FromJson("../cmd/workflow/configs/manager.json")
+	manager := NewBlockManager(true)
+	err := manager.FromJson("../../cmd/workflow/configs/manager.json")
 	if err != nil {
 		panic(err)
 	}
@@ -17,5 +17,4 @@ func TestManagerWorkflow(t *testing.T) {
 	for err := range manager.Feedback() {
 		panic(err)
 	}
-
 }

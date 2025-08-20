@@ -11,9 +11,9 @@ import (
 func TestVerifyHeader(t *testing.T) {
 	network, parent, current := HeaderTestData()
 	verifierInstanceConfig := mod.InstanceConfig{
-		CcsPath: "../../cmd/meta/test/n3/verifier_header.ccs",
-		PkPath:  "../../cmd/meta/test/n3/verifier_header.pk",
-		VkPath:  "../../cmd/meta/test/n3/verifier_header.vk",
+		CcsPath: "../../cmd/meta/n3/verifier_header.ccs",
+		PkPath:  "../../cmd/meta/n3/verifier_header.pk",
+		VkPath:  "../../cmd/meta/n3/verifier_header.vk",
 	}
 	//ct, err := new(N3VerifyHeaderWrapper).Circuit(
 	//	func() ([]circuit.HashableBlockHeader, error) {

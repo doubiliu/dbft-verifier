@@ -14,7 +14,7 @@ func NewN3BlockHeader(header *block.Header) *N3BlockHeader {
 	return &N3BlockHeader{header}
 }
 
-func (header *N3BlockHeader) Number() uint64 {
+func (header *N3BlockHeader) Height() uint64 {
 	return uint64(header.Header.Index)
 }
 func (header *N3BlockHeader) Encode(...any) ([]byte, error) {

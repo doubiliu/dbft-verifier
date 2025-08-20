@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"errors"
+	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
@@ -73,9 +74,6 @@ func (r *BlockRequest) ExtraVersion() (byte, error) {
 }
 
 func (r *BlockRequest) GetWitness(params ...any) (witness.Witness, error) {
-	if len(params) == 0 {
-		return nil, errors.New("invalid number of params provided, expect a circuitEnum at least")
-	}
 	if r.Ce.IsNeox() {
 		current, ok := r.BlockHeader.(*neox.NeoxBlockHeader)
 		if !ok {
@@ -206,12 +204,14 @@ func (r *BlockRequest) GetWitness(params ...any) (witness.Witness, error) {
 		}
 		// n3
 		if len(params) < 1 {
-			return nil, errors.New("invalid number of params provided, expect at least 2")
+			return nil, errors.New("invalid number of params provided, expect at least 1")
 		}
 		parent, ok := params[0].(*n3.N3BlockHeader)
 		if !ok {
 			return nil, errors.New("invalid parentData")
 		}
+		fmt.Printf("%+v\n", parent.Header)
+		fmt.Printf("%+v\n", current.Header)
 		assignment, err := new(n3.N3VerifyHeaderWrapper).Assignment(
 			func() ([]circuit.HashableBlockHeader, error) {
 				return []circuit.HashableBlockHeader{parent, current}, nil

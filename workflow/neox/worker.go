@@ -2,11 +2,13 @@ package neox
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend/groth16"
 	stdgroth16 "github.com/consensys/gnark/std/recursion/groth16"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
 	neox "github.com/txhsl/neox-dbft-verifier/circuit/neox"
 	"github.com/txhsl/neox-dbft-verifier/config"
@@ -26,6 +28,7 @@ type Worker struct {
 	service.DistributeServer
 	service.AggregateClient
 	feedback chan error
+	received map[string]struct{}
 }
 
 func (n *Worker) RuntimeJob() config.NodeJob {
@@ -42,7 +45,7 @@ func (n *Worker) Start() error {
 	}
 	go func() {
 		for err := range n.feedback {
-			fmt.Println("InnerCircuitProverNode Error: ", err)
+			fmt.Println("Worker Error: ", err)
 		}
 	}()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -136,12 +139,21 @@ func (n *Worker) runInSerial() error {
 				fmt.Println("first block need not to be proved in worker, ignore it")
 				continue
 			}
-			header := new(neox.NeoxBlockHeader)
+			header := neox.NewNeoxBlockHeader(new(types.Header))
 			err := header.UnmarshalJSON(request.Header)
 			if err != nil {
 				n.feedback <- err
 			}
-			fmt.Printf("receive block distribute request, block height: %d\n", header.Number())
+			blockHash, err := header.Hash()
+			if err != nil {
+				n.feedback <- err
+				continue
+			}
+			if _, ok := n.received[hex.EncodeToString(blockHash)]; ok {
+				continue // Repeatedly sending blocks
+			}
+			n.received[hex.EncodeToString(blockHash)] = struct{}{}
+			fmt.Printf("receive block distribute request, block height: %d\n", header.Height())
 			blockRequest := workflow.BlockRequest{
 				BlockHeader: header,
 				Ce:          circuit.RlpHash,
@@ -156,11 +168,11 @@ func (n *Worker) runInSerial() error {
 
 			proof, err := groth16.Prove(rlpInstance.Ccs, rlpInstance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
 			if err != nil {
-				fmt.Println("rlpHash prove error in block", header.Number())
+				fmt.Println("rlpHash prove error in block", header.Height())
 				n.feedback <- err
 				continue
 			}
-			fmt.Printf("finish rlpHash proof, block height: %d\n", header.Number())
+			fmt.Printf("finish rlpHash proof, block height: %d\n", header.Height())
 			//proveResponse := pipeline.NewProveResponse(&rlpHashTask, proof, circuit.RlpHash)
 			//n.tmp <- proveResponse
 			err = n.CommitProof(header, proof, circuit.RlpHash)
@@ -184,13 +196,13 @@ func (n *Worker) runInSerial() error {
 			}
 			nextProof, err := groth16.Prove(nextInstance.Ccs, nextInstance.Pk, nextWitness, blockRequest.Option()...)
 			if err != nil {
-				fmt.Println("next prove error in block", header.Number())
+				fmt.Println("next prove error in block", header.Height())
 				n.feedback <- err
 				continue
 			}
 			//nextResponse := pipeline.NewProveResponse(&next, nextProof, next.ce)
 			err = n.CommitProof(header, nextProof, next.CircuitEnum())
-			fmt.Printf("finish next proof, block height: %d\n", header.Number())
+			fmt.Printf("finish next proof, block height: %d\n", header.Height())
 
 		}
 	}()
@@ -223,12 +235,21 @@ func (n *Worker) runInPipeline() error {
 				fmt.Println("first block need not to be proved in worker, ignore it")
 				continue
 			}
-			header := new(neox.NeoxBlockHeader)
+			header := neox.NewNeoxBlockHeader(new(types.Header))
 			err := header.UnmarshalJSON(request.Header)
 			if err != nil {
 				n.feedback <- err
 			}
-			fmt.Printf("receive block distribute request, block height: %d\n", header.Number())
+			blockHash, err := header.Hash()
+			if err != nil {
+				n.feedback <- err
+				continue
+			}
+			if _, ok := n.received[hex.EncodeToString(blockHash)]; ok {
+				continue // Repeatedly sending blocks
+			}
+			n.received[hex.EncodeToString(blockHash)] = struct{}{}
+			fmt.Printf("receive block distribute request, block height: %d\n", header.Height())
 			blockRequest := workflow.BlockRequest{
 				BlockHeader: header,
 				Ce:          circuit.RlpHash,
@@ -260,7 +281,7 @@ func (n *Worker) runInPipeline() error {
 	//}()
 	go func() {
 		for response := range nextScheduler.Response {
-			fmt.Printf("finish next proof, circuit: %d, block height: %d\n", response.CircuitType, response.Request.(*workflow.Task).BlockHeader.Number())
+			fmt.Printf("finish next proof, circuit: %d, block height: %d\n", response.CircuitType, response.Request.(*workflow.Task).BlockHeader.Height())
 			err = n.CommitProof(response.Request.(*workflow.Task).BlockHeader.(*neox.NeoxBlockHeader), response.Proof, response.CircuitEnum())
 			if err != nil {
 				n.feedback <- err
@@ -297,11 +318,11 @@ func (n *Worker) runInPipeline() error {
 
 			proof, err := groth16.Prove(rlpInstance.Ccs, rlpInstance.Pk, rlpWitness, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
 			if err != nil {
-				fmt.Println("rlpHash prove error in block", task.BlockHeader.Number())
+				fmt.Println("rlpHash prove error in block", task.BlockHeader.Height())
 				n.feedback <- err
 				continue
 			}
-			fmt.Printf("finish rlpHash proof, block height: %d\n", task.BlockHeader.Number())
+			fmt.Printf("finish rlpHash proof, block height: %d\n", task.BlockHeader.Height())
 			//proveResponse := pipeline.NewProveResponse(&rlpHashTask, proof, circuit.RlpHash)
 			//n.tmp <- proveResponse
 			err = n.CommitProof(task.BlockHeader.(*neox.NeoxBlockHeader), proof, circuit.RlpHash)
@@ -320,6 +341,7 @@ func (n *Worker) FromCommonConfig(cc config.CommonConfig, params ...any) error {
 	n.AggregateClient = *service.NewAggregateClient(n.ServiceConfig)
 	n.DistributeServer = *service.NewDistributeServer(n.ServiceConfig, n.feedback)
 	n.tasks = make(chan workflow.Task, 100) // todo
+	n.received = make(map[string]struct{})
 	return nil
 }
 func NewWorker(nodeConfig config.NodeConfig, serviceConfig config.ServiceConfig) Worker {

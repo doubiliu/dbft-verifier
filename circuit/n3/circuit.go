@@ -3,6 +3,7 @@ package n3
 import (
 	native_crypto "crypto/ecdsa"
 	"errors"
+	"fmt"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/math/emulated"
 	"github.com/consensys/gnark/std/math/uints"
@@ -57,12 +58,12 @@ func (c *N3VerifyHeaderWrapper) instance(headerGenerator func() ([]circuit.Hasha
 	if !ok {
 		return nil, errors.New("invalid header")
 	}
-	if len(params) == 0 {
-		return nil, errors.New("invalid parameters")
-	}
-	network, ok := params[0].(uint32)
-	if !ok {
-		return nil, errors.New("invalid parameters")
+	network := uint32(860833102) // todo ?
+	if len(params) != 0 {
+		network, ok = params[0].(uint32)
+		if !ok {
+			return nil, errors.New("invalid parameters")
+		}
 	}
 	pparent, err := parent.ToHeaderParameter()
 	if err != nil {
@@ -90,6 +91,7 @@ func (c *N3VerifyHeaderWrapper) instance(headerGenerator func() ([]circuit.Hasha
 		}
 	}
 	hashData := hash.NetSha256(network, current.Header)
+	fmt.Println(hashData)
 	mappingRules := make([]frontend.Variable, 5)
 	for i := 0; i < 5; i++ {
 		sig := InvocationScript[i*SignatureDataLen+2 : (i+1)*SignatureDataLen]
@@ -103,6 +105,7 @@ func (c *N3VerifyHeaderWrapper) instance(headerGenerator func() ([]circuit.Hasha
 			}
 		}
 	}
+	fmt.Println(mappingRules)
 	pHash, err := parent.Hash()
 	if err != nil {
 		return nil, err

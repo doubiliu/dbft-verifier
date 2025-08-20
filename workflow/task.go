@@ -39,7 +39,12 @@ func (task *Task) Next() (Task, bool, error) {
 	switch extraVersion {
 	case neox.ExtraV0:
 		if task.CircuitEnum() == circuit.RlpHash {
-			return Task{task.BlockRequest, make([]any, 0)}, false, nil
+			nextRequest := BlockRequest{
+				BlockHeader: task.BlockRequest.BlockHeader,
+				Ce:          circuit.NoSigRlp,
+				StartTime:   task.BlockRequest.StartTime,
+			}
+			return Task{&nextRequest, make([]any, 0)}, false, nil
 		} else if task.CircuitEnum() == circuit.NoSigRlp || task.CircuitEnum() == circuit.NeoxOuter {
 			return Task{}, true, nil
 		} else {
@@ -47,7 +52,12 @@ func (task *Task) Next() (Task, bool, error) {
 		}
 	case neox.ExtraV1, neox.ExtraV2:
 		if task.CircuitEnum() == circuit.RlpHash {
-			return Task{task.BlockRequest, make([]any, 0)}, false, nil
+			nextRequest := BlockRequest{
+				BlockHeader: task.BlockRequest.BlockHeader,
+				Ce:          circuit.ToG2Hash,
+				StartTime:   task.BlockRequest.StartTime,
+			}
+			return Task{&nextRequest, make([]any, 0)}, false, nil
 		} else if task.CircuitEnum() == circuit.ToG2Hash || task.CircuitEnum() == circuit.NeoxOuter {
 			return Task{}, true, nil
 		} else {

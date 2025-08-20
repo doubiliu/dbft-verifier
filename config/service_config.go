@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"sort"
 )
 
 type ServiceConfig struct {
@@ -33,6 +34,25 @@ func (url *BaseURL) DistributeString() string {
 }
 func (url *BaseURL) AggregateString() string {
 	return fmt.Sprintf("%s:%d", url.Address, url.AggregatorPort)
+}
+
+func (config *ServiceConfig) AllocBlock(height uint64, isWorker bool) NodeID {
+	//height := block.Number()
+	idLists := make([]NodeID, 0)
+	if isWorker {
+		for id, _ := range config.Network.Workers {
+			idLists = append(idLists, id)
+		}
+	} else {
+		for id, _ := range config.Network.Aggregators {
+			idLists = append(idLists, id)
+		}
+	}
+	sort.Slice(idLists, func(i, j int) bool {
+		return idLists[i] < idLists[j]
+	})
+	return idLists[height%uint64(len(idLists))]
+
 }
 
 //// GrpcConfig all nodes have a same GrpcConfig

@@ -31,5 +31,5 @@ type HashableBlockHeader interface {
 	Hash(...any) ([]byte, error)
 	UnmarshalJSON([]byte) error
 	MarshalJSON() ([]byte, error)
-	Number() uint64
+	Height() uint64
 }
