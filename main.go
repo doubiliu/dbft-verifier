@@ -20,6 +20,7 @@ func main() {
 	flag.StringVar(&chain, "chain", "neox", "chain type, n3 or neox")
 	flag.StringVar(&job, "job", "node", "node job, manager or node")
 	flag.StringVar(&configPath, "config", "common_config.json", "config json file for loading config into node or manager")
+	network := uint32(*flag.Uint("network", 894710606, "n3 network"))
 	flag.Parse()
 	if chain != "neox" && chain != "n3" {
 		panic("invalid chain")
@@ -51,6 +52,7 @@ func main() {
 				if err != nil {
 					panic(err)
 				}
+				worker.SetNetwork(network)
 				err = worker.Start()
 				if err != nil {
 					panic(err)

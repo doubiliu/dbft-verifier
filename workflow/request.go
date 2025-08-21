@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"errors"
-	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
@@ -14,6 +13,7 @@ import (
 	"github.com/txhsl/neox-dbft-verifier/circuit"
 	"github.com/txhsl/neox-dbft-verifier/circuit/n3"
 	neox "github.com/txhsl/neox-dbft-verifier/circuit/neox"
+	"github.com/txhsl/neox-dbft-verifier/config"
 	"time"
 )
 
@@ -210,12 +210,15 @@ func (r *BlockRequest) GetWitness(params ...any) (witness.Witness, error) {
 		if !ok {
 			return nil, errors.New("invalid parentData")
 		}
-		fmt.Printf("%+v\n", parent.Header)
-		fmt.Printf("%+v\n", current.Header)
+		network := uint32(config.DEFAULT_N3_NETWORK) // todo ?
+		if len(params) > 1 {
+			network = params[1].(uint32)
+		}
+
 		assignment, err := new(n3.N3VerifyHeaderWrapper).Assignment(
 			func() ([]circuit.HashableBlockHeader, error) {
 				return []circuit.HashableBlockHeader{parent, current}, nil
-			})
+			}, network)
 		if err != nil {
 			return nil, err
 		}

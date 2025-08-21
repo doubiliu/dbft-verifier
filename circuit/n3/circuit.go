@@ -3,7 +3,6 @@ package n3
 import (
 	native_crypto "crypto/ecdsa"
 	"errors"
-	"fmt"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/math/emulated"
 	"github.com/consensys/gnark/std/math/uints"
@@ -11,6 +10,7 @@ import (
 	"github.com/nspcc-dev/neo-go/pkg/core/block"
 	"github.com/nspcc-dev/neo-go/pkg/crypto/hash"
 	"github.com/txhsl/neox-dbft-verifier/circuit"
+	"github.com/txhsl/neox-dbft-verifier/config"
 	"math/big"
 )
 
@@ -58,7 +58,7 @@ func (c *N3VerifyHeaderWrapper) instance(headerGenerator func() ([]circuit.Hasha
 	if !ok {
 		return nil, errors.New("invalid header")
 	}
-	network := uint32(860833102) // todo ?
+	network := uint32(config.DEFAULT_N3_NETWORK)
 	if len(params) != 0 {
 		network, ok = params[0].(uint32)
 		if !ok {
@@ -91,7 +91,6 @@ func (c *N3VerifyHeaderWrapper) instance(headerGenerator func() ([]circuit.Hasha
 		}
 	}
 	hashData := hash.NetSha256(network, current.Header)
-	fmt.Println(hashData)
 	mappingRules := make([]frontend.Variable, 5)
 	for i := 0; i < 5; i++ {
 		sig := InvocationScript[i*SignatureDataLen+2 : (i+1)*SignatureDataLen]
@@ -105,7 +104,6 @@ func (c *N3VerifyHeaderWrapper) instance(headerGenerator func() ([]circuit.Hasha
 			}
 		}
 	}
-	fmt.Println(mappingRules)
 	pHash, err := parent.Hash()
 	if err != nil {
 		return nil, err

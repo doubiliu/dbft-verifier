@@ -30,8 +30,12 @@ type Worker struct {
 	feedback chan error
 	parents  map[string]*n3.N3BlockHeader
 	received map[string]struct{}
+	network  uint32
 }
 
+func (n *Worker) SetNetwork(network uint32) {
+	n.network = network
+}
 func (n *Worker) RuntimeJob() config.NodeJob {
 	return config.Worker
 }
@@ -44,6 +48,7 @@ func (n *Worker) Start() error {
 	if n.Job != config.Worker {
 		return errors.New("not a worker")
 	}
+	fmt.Println("n3 worker network: ", n.network)
 	go func() {
 		for err := range n.feedback {
 			fmt.Println("Worker Error: ", err)
@@ -125,13 +130,12 @@ func (n *Worker) runInSerial() error {
 				StartTime:   time.Now(),
 			}
 			task := workflow.NewTask(&blockRequest)
-			task.AddParams(parent)
+			task.AddParams(parent, n.network)
 			w, err := task.Witness()
 			if err != nil {
 				n.feedback <- err
 				continue
 			}
-			fmt.Println(w)
 			proof, err := groth16.Prove(instance.Ccs, instance.Pk, w, stdgroth16.GetNativeProverOptions(ecc.BN254.ScalarField(), ecc.BN254.ScalarField()))
 			if err != nil {
 				fmt.Println("n3 verifier prove error in block", header.Height())
@@ -199,7 +203,7 @@ func (n *Worker) runInPipeline() error {
 				StartTime:   time.Now(),
 			}
 			task := workflow.NewTask(&blockRequest)
-			task.AddParams(parent)
+			task.AddParams(parent, n.network)
 			scheduler.Prove(&task)
 		}
 	}()

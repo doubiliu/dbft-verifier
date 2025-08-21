@@ -17,14 +17,45 @@
 # ==============================================================================
 
 # --- Step 1: Parse Command-Line Arguments ---
-CHAIN_NAME="neox" # Default chain name
+CHAIN_NAME="neox"  # Default chain name
+NETWORK=894710606         # Default network (empty)
+
 rm -rf configs/
-# Simple argument parsing
-if [ "$1" == "--chain" ] && [ -n "$2" ]; then
-    CHAIN_NAME="$2"
-fi
+
+# Argument parsing
+i=1
+while [ $i -le $# ]; do
+    case "$1" in
+        --chain)
+            if [ -n "$2" ]; then
+                CHAIN_NAME="$2"
+                shift 2
+            else
+                echo "Error: --chain requires a value"
+                exit 1
+            fi
+            ;;
+        --network)
+            if [ -n $2 ]; then
+                NETWORK=$2
+                shift 2
+            else
+                echo "Error: --network requires a value"
+                exit 1
+            fi
+            ;;
+        *)
+            echo "Error: Unknown option $1"
+            exit 1
+            ;;
+    esac
+done
 
 echo "Starting deployment for chain: $CHAIN_NAME"
+if [ -n "$NETWORK" ]; then
+    echo "Using network: $NETWORK"
+fi
+
 
 
 # --- Step 2: Check if the 'main' binary exists
@@ -88,7 +119,7 @@ for sub_dir in \$node_subdirs; do
         echo "  -> Starting node in \$sub_dir"
         # Start the node process in the background
         # Note: We run ./main from the parent directory of sub_dir
-        nohup ./main --job node --config "\$sub_dir/common_config.json" --chain $CHAIN_NAME > "\$sub_dir/log.txt" 2> "\$sub_dir/error.txt" &
+        nohup ./main --job node --config "\$sub_dir/common_config.json" --chain $CHAIN_NAME --network $NETWORK > "\$sub_dir/log.txt" 2> "\$sub_dir/error.txt" &
 
         # Capture the process ID (PID) of the last background command
         pid=\$!

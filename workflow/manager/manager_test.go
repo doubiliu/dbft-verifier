@@ -5,7 +5,7 @@ import (
 )
 
 func TestManagerWorkflow(t *testing.T) {
-	manager := NewBlockManager(true)
+	manager := NewBlockManager(false)
 	err := manager.FromJson("../../cmd/workflow/configs/manager.json")
 	if err != nil {
 		panic(err)
