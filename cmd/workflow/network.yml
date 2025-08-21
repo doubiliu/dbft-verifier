@@ -1,0 +1,9 @@
+workers:
+- id: 0
+  address: localhost
+  distribute_port: 9000
+  aggregate_port: -1
+- id: 1
+  address: localhost
+  distribute_port: 9001
+  aggregate_port: -1

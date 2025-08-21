@@ -1,0 +1,26 @@
+#This file defines the absolute path of the circuit files required for each node (identified by IP) on the remote machine.
+# Need to manually provide!!!
+localhost:
+  rlp_hash_instance:
+    ccs_path: "/root/neo/dbft-verifier/cmd/meta/v1/rlp_encode_hash_extra_v1_test.ccs"
+    pk_path: "/root/neo/dbft-verifier/cmd/meta/v1/rlp_encode_hash_extra_v1_test.pk"
+    vk_path: "/root/neo/dbft-verifier/cmd/meta/v1/rlp_encode_hash_extra_v1_test.vk"
+  to_g2_hash_instance:
+    ccs_path: "/root/neo/dbft-verifier/cmd/meta/v1/to_g2_hash.ccs"
+    pk_path: "/root/neo/dbft-verifier/cmd/meta/v1/to_g2_hash.pk"
+    vk_path: "/root/neo/dbft-verifier/cmd/meta/v1/to_g2_hash.vk"
+#  todo
+  no_sig_rlp_instance:
+    ccs_path: ""
+    pk_path: ""
+    vk_path: ""
+  neox_outer_instance:
+    ccs_path: "/root/neo/dbft-verifier/cmd/meta/v1/verify_header_extra_v1.ccs"
+    pk_path: "/root/neo/dbft-verifier/cmd/meta/v1/verify_header_extra_v1.pk"
+    vk_path: "/root/neo/dbft-verifier/cmd/meta/v1/verify_header_extra_v1.vk"
+  n3_verifier_instance:
+    ccs_path: "/root/neo/dbft-verifier/cmd/meta/n3/verifier_header.ccs"
+    pk_path: "/root/neo/dbft-verifier/cmd/meta/n3/verifier_header.pk"
+    vk_path: "/root/neo/dbft-verifier/cmd/meta/n3/verifier_header.vk"
+
+
