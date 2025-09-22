@@ -1,0 +1,18 @@
+syntax = "proto3";// 协议为proto3
+
+package proto;
+option go_package="/aggregate";
+
+message AggregateRequest{
+//  int32 height = 1; // blockHeight is no need, in blockHeader
+  bytes blockHash = 1; // blockHash, for map[blockHash]types.Header to get a header and compute the public inputs
+  bytes proof = 2; // proof, no public witness
+  int32 circuit = 3; // which circuit is the proof proves
+}
+message AggregateResponse{
+  bool success = 1;
+}
+
+service AggregateService{
+  rpc Commit (AggregateRequest) returns (AggregateResponse){}
+}

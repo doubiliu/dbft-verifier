@@ -1,0 +1,25 @@
+# Ignore IDE files
+.idea/
+.vscode/
+
+# Ignore test outputs
+*/*.pk
+*/*.vk
+*/*.sol
+*/*.ccs
+*/*.proof
+*/*.witness
+cmd/Phase1*
+cmd/Phase2*
+cmd/srs*
+circuit/Phase1*
+circuit/Phase2*
+circuit/srs*
+nohup.out
+cmd/meta/*
+cmd/workflow/configs/*
+*/*.yml
+*/main
+main
+*/*.txt
+*/*.log
